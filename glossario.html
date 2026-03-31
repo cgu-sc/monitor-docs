@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glossário — Monitor de Compras SC</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <span class="header-doc-label">Documentação Técnica</span>
+  <a class="header-brand" href="index.html">
+    <div class="brand-meta">
+      <span class="brand-label">CGU · SC</span>
+      <span class="brand-title">Monitor <em>de</em> Compras</span>
+    </div>
+  </a>
+  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+</header>
+
+<nav class="tab-nav">
+  <a class="tab-link" href="index.html"><span class="tab-icon">⌂</span> Início</a>
+  <a class="tab-link" href="regras-negocio.html"><span class="tab-icon">≡</span> Regras de Negócio</a>
+  <a class="tab-link" href="fontes-de-dados.html"><span class="tab-icon">⬢</span> Fontes de Dados</a>
+  <a class="tab-link" href="arquitetura.html"><span class="tab-icon">⬡</span> Arquitetura</a>
+  <a class="tab-link" href="camada-sql.html"><span class="tab-icon">&lt;/&gt;</span> Camada SQL</a>
+  <a class="tab-link" href="qualidade-dados.html"><span class="tab-icon">⚠</span> Qualidade de Dados</a>
+  <a class="tab-link active" href="glossario.html"><span class="tab-icon">§</span> Glossário</a>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="page-top">
+    <div class="page-eyebrow">Documentação / Glossário</div>
+    <h1 class="page-title"><em>Glossário</em></h1>
+    <p class="page-subtitle">Termos do domínio de compras públicas, siglas e conceitos técnicos do projeto</p>
+  </div>
+
+  <input type="text" class="search-input" id="glossSearch" placeholder="Filtrar termos… (ex: UASG, sigilo, adjudicado, ROW_NUMBER)">
+
+  <div id="glossContent">
+
+    <div class="gloss-section">
+      <div class="gloss-letter">A</div>
+      <div class="glossary-item">
+        <div class="glossary-term">Adjudicação</div>
+        <div class="glossary-def">Ato que atribui ao licitante vencedor o objeto da licitação. No FaseExterna, indicada por <code>proposta_item.situacao = '6'</code>. Diferente de homologação — adjudicação é por item, homologação é pela compra inteira.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Alice</div>
+        <div class="glossary-def">Sistema de análise de licitações da CGU. No projeto, fornece datas de publicação confiáveis (fonte preferencial para <code>data_primeira_publicacao</code>) e alertas de irregularidades vinculados às licitações. Presente no painel desde v1.2.1.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Anti-join</div>
+        <div class="glossary-def">Técnica SQL para incluir apenas registros que não existem em outra tabela/view, via <code>WHERE NOT EXISTS (SELECT 1 FROM ...)</code>. Garante que cada licitação venha de uma única fonte no sistema consolidado.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">C</div>
+      <div class="glossary-item">
+        <div class="glossary-term">CATMAT / CATSER</div>
+        <div class="glossary-def">Catálogos federais de Materiais (CATMAT) e Serviços (CATSER) do SIASG. A classificação mais completa vem do Siasg DW via <code>D_ITCP_MATERIAL_SERVICO</code>, referenciada pelo FaseExterna (<code>codigo_item_catalogo</code>) e pelo Comprasnet (<code>codconjmat</code>).</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">CGU / CGPLA</div>
+        <div class="glossary-def">Controladoria-Geral da União. O projeto é desenvolvido pela CGU Regional SC (CGU/R-SC). A CGPLA (Coordenação-Geral de Planejamento) demandou ajustes nas versões v1.3.2 e posteriores.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Cod_licitacao</div>
+        <div class="glossary-def">Identificador único calculado de 17 dígitos: UASG (6) + Modalidade (2) + Número+Ano (9). É a chave de deduplicação entre fontes — o mesmo código em duas fontes representa a mesma licitação.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Comprasnet</div>
+        <div class="glossary-def">Portal legado de compras públicas (SERPRO). Utilizado para Pregões e RDC. Na CGU: <code>db_compras.comprasnet.*</code> (sem sigilo) e <code>db_compras_sigiloso.comprasnet.*</code> (valores sigilosos reais). 2ª prioridade para licitações, 4ª para itens.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Concorrência (modal. 3)</div>
+        <div class="glossary-def">Modalidade para contratações de maior vulto. Em modo "Fechado", não há fase de lances — <code>valor_proposta_calculado</code> é o único campo disponível para valor adjudicado. Por isso foi adicionado como 4º fallback na hierarquia em v2.0.9.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">D</div>
+      <div class="glossary-item">
+        <div class="glossary-term">data_primeira_publicacao</div>
+        <div class="glossary-def">Data em que a licitação foi publicada pela primeira vez. Fonte preferencial: Alice (versao = 1). Fallbacks por fonte: <code>data_hora_inclusao</code> (FaseExterna), <code>datainclusao</code> (Comprasnet), <code>DT_CMPR_RESULTADO_COMPRA</code> (Siasg). O campo <code>data_publicacao_fonte</code> indica qual foi usada.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Dispensa (modal. 6)</div>
+        <div class="glossary-def">Modalidade em que a licitação é dispensável por lei (valor abaixo do limite, emergência, etc.). Presente no FaseExterna, Comprasnet, Siasg DW e PNCP. O PNCP é a única fonte atualizada para Dispensas recentes após abril/2024.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">F</div>
+      <div class="glossary-item">
+        <div class="glossary-term">FaseExterna</div>
+        <div class="glossary-def">Módulo do novo portal ComprasGov (SERPRO) que registra a fase externa das licitações. 1ª prioridade no projeto. Disponível em <code>db_compras.ComprasGov_FaseExterna.*</code>. Cobre 2024+, não possui Inexigibilidade (modal. 7). As views <code>vw_adjudicado_comprasgov_SC</code> e <code>vw_valor_estimado_comprasgov_SC</code> (v1.3.3) foram precursoras da integração completa da v2.0.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">fonte_dados</div>
+        <div class="glossary-def">Campo calculado nas views consolidadas: <code>'FASEEXTERNA'</code>, <code>'COMPRASNET'</code>, <code>'SIASG'</code> ou <code>'PNCP'</code>. Útil para diagnóstico e para entender limitações específicas por fonte nos resultados do painel.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">H</div>
+      <div class="glossary-item">
+        <div class="glossary-term">Homologação</div>
+        <div class="glossary-def">Ato final da autoridade que ratifica o resultado de uma licitação. Registrada a nível de <em>compra</em> (<code>compra.homologada = 'S'</code> no FaseExterna). Quando <code>Situacao_Gerada = 'Homologada'</code>, o sigilo dos valores é liberado no painel.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">I</div>
+      <div class="glossary-item">
+        <div class="glossary-term">Inexigibilidade (modal. 7)</div>
+        <div class="glossary-def">Modalidade em que a licitação é inexigível por impossibilidade de competição (fornecedor exclusivo, artista consagrado, etc.). Não existe no FaseExterna. Para dados recentes, a única fonte é o PNCP.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">ItensConsol</div>
+        <div class="glossary-def">Tabela no Power BI (criada em v2.0.5) alimentada pela <code>sp_itens_licitacoes_pbi</code>. Unifica o que eram as tabelas <code>ItensLicitacao</code> e <code>ItensDispInex</code> da série v1.x. Contém itens com sigilo já censurado.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">L</div>
+      <div class="glossary-item">
+        <div class="glossary-term">LicitacoesConsol</div>
+        <div class="glossary-def">Tabela principal no Power BI (desde v2.0), alimentada pela <code>Consulta_LicitacoesSC_PBI</code>. Unifica o que eram as tabelas <code>LicitacoesSC</code> e <code>DispInex</code> da série v1.x.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">M</div>
+      <div class="glossary-item">
+        <div class="glossary-term">Monitor de Compras</div>
+        <div class="glossary-def">Nome atual do painel, adotado na v1.2 (outubro/2024). Antes chamado "Painel de Licitações" (v1.1) e simplesmente "painel" na v1.0.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Modalidade</div>
+        <div class="glossary-def">Tipo de procedimento licitatório. Principais: 1=Convite, 2=Tomada de Preços, 3=Concorrência, 5=Pregão, 6=Dispensa, 7=Inexigibilidade, 20=Concurso, 99=RDC. No Power BI, modalidades 6 e 7 são filtradas separadamente.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">N</div>
+      <div class="glossary-item">
+        <div class="glossary-term">Não Homologada</div>
+        <div class="glossary-def">Valor de <code>Situacao_Gerada</code> para licitações em andamento. É a única situação que aciona a censura de sigilo no painel — valores sigilosos são zerados ou exibidos em faixas.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">P</div>
+      <div class="glossary-item">
+        <div class="glossary-term">PDM</div>
+        <div class="glossary-def">Padrão de Descrição de Material. Campo do Siasg DW (<code>D_ITCP_PADRAO_DESC_MAT</code>) que define o padrão de nomenclatura do item no catálogo federal.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">PNCP</div>
+        <div class="glossary-def">Portal Nacional de Contratações Públicas. 4ª fonte de dados. Usada exclusivamente para Dispensas e Inexigibilidades que não existem nas 3 fontes anteriores. É a única fonte atualizada para essas modalidades após o encerramento do Siasg DW (abril/2024).</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Possui_Sigilo</div>
+        <div class="glossary-def">Campo calculado que retorna as strings <code>'SIM'</code> ou <code>'NÃO'</code>. Indica se a licitação possui ao menos um item com orçamento sigiloso. Medidas DAX devem comparar como string.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Pregão (modal. 5)</div>
+        <div class="glossary-def">Modalidade mais utilizada para compras de bens e serviços comuns. Possui fase de lances em sessão pública (modo Aberto) ou lacrada (modo Fechado). Principal fonte: FaseExterna (2024+) e Comprasnet (histórico).</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">R</div>
+      <div class="glossary-item">
+        <div class="glossary-term">RDC</div>
+        <div class="glossary-def">Regime Diferenciado de Contratações (código 99). Modalidade especial criada para obras da Copa do Mundo e Olimpíadas. Disponível apenas no Comprasnet.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">ROW_NUMBER</div>
+        <div class="glossary-def">Função de janela SQL usada para deduplicação. No FaseExterna, sempre com <code>ORDER BY versao DESC, id DESC</code> — o <code>id DESC</code> é o desempate crítico adicionado em v2.0.9 para itens recriados com o mesmo <code>versao = 0</code>.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">S</div>
+      <div class="glossary-item">
+        <div class="glossary-term">Siasg DW</div>
+        <div class="glossary-def">Data Warehouse do Sistema Integrado de Administração de Serviços Gerais. Parou de ser atualizado em abril/2024. 3ª prioridade para licitações mas 2ª para itens — possui classificação CATMAT/CATSER completa e dados do fornecedor vencedor.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Sigilo (orçamentário)</div>
+        <div class="glossary-def">Proteção legal do valor estimado de itens durante a disputa. No projeto, valores sigilosos são zerados ou exibidos em faixas enquanto <code>Situacao_Gerada = 'Não Homologada'</code>. Controlado na camada SQL antes de chegar ao Power BI.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">Situacao_Gerada</div>
+        <div class="glossary-def">Campo calculado pelas views, normalizado entre todas as fontes. Valores: Homologada, Revogada, Anulada, Cancelada, Suspensa, Fracassada, Deserta, Não Homologada. Apenas "Não Homologada" aciona a censura de sigilo.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">sp_describe_first_result_set</div>
+        <div class="glossary-def">Stored procedure do SQL Server que retorna tipos e metadados das colunas de uma query. Ferramenta padrão de diagnóstico para conflitos de tipo em <code>UNION ALL</code> — comparar por nome de coluna, não por posição.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">sp_itens_licitacoes_pbi</div>
+        <div class="glossary-def">Stored procedure criada em v2.0.5. Entrega itens ao Power BI com sigilo censurado. Resolve timeout de +1h usando <code>#temp_censura</code> como barreira de otimização — força planos de execução separados no SQL Server, reduzindo para ~5–8 min.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">SRP</div>
+        <div class="glossary-def">Sistema de Registro de Preços. Modalidade de compra em que o vencedor registra o preço por um período. Impacta o cálculo do valor estimado: no Comprasnet, <code>ipgValorRef</code> é unitário para SRP e global para Normal.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">T</div>
+      <div class="glossary-item">
+        <div class="glossary-term">temp_CGUSC</div>
+        <div class="glossary-def">Base de dados de trabalho onde residem as views e stored procedures do projeto (<code>temp_CGUSC.compras.*</code>). Migração para essa base ocorreu em v1.1.1, garantindo maior perenidade ao projeto.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">TRY_CAST</div>
+        <div class="glossary-def">Função SQL Server que converte um valor retornando NULL em caso de falha (em vez de erro). Usada nos JOINs entre FaseExterna e Siasg DW em <code>codigo_item_catalogo</code>, que pode conter valores não-numéricos no FaseExterna.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">U</div>
+      <div class="glossary-item">
+        <div class="glossary-term">UASG</div>
+        <div class="glossary-def">Unidade Administrativa de Serviços Gerais. Código de 6 dígitos que identifica cada unidade gestora federal. É a primeira parte do <code>Cod_licitacao</code>. O painel cobre apenas UASGs catarinenses jurisdicionadas à CGU/R-SC.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">UNION ALL</div>
+        <div class="glossary-def">Operador SQL que combina resultados de queries sem remover duplicatas. Usado nas views consolidadas com anti-joins. Requer tipos compatíveis em cada coluna — incompatibilidades foram corrigidas em v2.0.8.</div>
+      </div>
+    </div>
+
+    <div class="gloss-section">
+      <div class="gloss-letter">V</div>
+      <div class="glossary-item">
+        <div class="glossary-term">valor_adjudicado_calculado</div>
+        <div class="glossary-def">Valor total adjudicado do item: quantidade × valor unitário homologado. No FaseExterna, calculado via hierarquia de 4 valores (negociado → lance → melhor valor → proposta inicial). Condições: <code>item.situacao = '1'</code> E <code>proposta.situacao = '6'</code>.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">valor_estimado_calculado</div>
+        <div class="glossary-def">Valor total estimado do item após multiplicação pela quantidade. No FaseExterna: sempre <code>qtd × valor_estimado</code> (correção v2.0.8 — campo sempre unitário). No Comprasnet: depende de SRP/Normal. No Siasg DW: campo global já pronto.</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">versao</div>
+        <div class="glossary-def">Campo do FaseExterna que indica a versão do registro. O banco não guarda histórico — todos os registros duplicados têm a mesma versao. Para itens recriados após alterações, múltiplos registros podem ter <code>versao = 0</code>, exigindo <code>id DESC</code> como desempate (v2.0.9).</div>
+      </div>
+      <div class="glossary-item">
+        <div class="glossary-term">vw_jurisdicionadas_sc</div>
+        <div class="glossary-def">View de suporte que define o conjunto de UASGs de Santa Catarina sob jurisdição da CGU/R-SC. Cruza com o Portal da Transparência (<code>db_portal</code>) para obter o código UG correto. Aplicada como filtro de escopo em todas as views de licitações.</div>
+      </div>
+    </div>
+
+  </div><!-- /glossContent -->
+
+  <script>
+    document.getElementById('glossSearch').addEventListener('input', function () {
+      var q = this.value.toLowerCase().trim();
+      document.querySelectorAll('.glossary-item').forEach(function(item) {
+        item.style.display = (!q || item.textContent.toLowerCase().includes(q)) ? '' : 'none';
+      });
+      document.querySelectorAll('.gloss-section').forEach(function(sec) {
+        var visible = Array.from(sec.querySelectorAll('.glossary-item')).some(function(i) {
+          return i.style.display !== 'none';
+        });
+        sec.style.display = visible ? '' : 'none';
+      });
+    });
+  </script>
+
+</div>
+<footer class="page-footer">
+  <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
+  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+</footer>
+</body></html>

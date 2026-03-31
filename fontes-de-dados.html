@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fontes de Dados — Monitor de Compras SC</title>
+  <link rel="stylesheet" href="style.css">
+<style>
+  .source-tag { color: #d0dfe6 !important; background: rgba(0,0,0,.35) !important; border-color: rgba(255,255,255,.12) !important; }
+  .source-card p { color: #7a9caa !important; }
+  .source-card .source-name { color: #c5d5da !important; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <span class="header-doc-label">Documentação Técnica</span>
+  <a class="header-brand" href="index.html">
+    <div class="brand-meta">
+      <span class="brand-label">CGU · SC</span>
+      <span class="brand-title">Monitor <em>de</em> Compras</span>
+    </div>
+  </a>
+  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+</header>
+
+<nav class="tab-nav">
+  <a class="tab-link" href="index.html"><span class="tab-icon">⌂</span> Início</a>
+  <a class="tab-link" href="regras-negocio.html"><span class="tab-icon">≡</span> Regras de Negócio</a>
+  <a class="tab-link active" href="fontes-de-dados.html"><span class="tab-icon">⬢</span> Fontes de Dados</a>
+  <a class="tab-link" href="arquitetura.html"><span class="tab-icon">⬡</span> Arquitetura</a>
+  <a class="tab-link" href="camada-sql.html"><span class="tab-icon">&lt;/&gt;</span> Camada SQL</a>
+  <a class="tab-link" href="qualidade-dados.html"><span class="tab-icon">⚠</span> Qualidade de Dados</a>
+  <a class="tab-link" href="glossario.html"><span class="tab-icon">§</span> Glossário</a>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="page-top">
+    <div class="page-eyebrow">Documentação / Fontes de Dados</div>
+    <h1 class="page-title">Fontes de <em>Dados</em></h1>
+    <p class="page-subtitle">Os quatro sistemas federais + fonte auxiliar que alimentam o Monitor de Compras</p>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">Visão Geral</div>
+    <h2 class="section-title">As Cinco <em>Fontes</em></h2>
+    <p class="section-desc">Cada fonte tem cobertura temporal e características distintas. A hierarquia garante que, quando uma licitação existe em múltiplas fontes, sempre prevalece a mais completa. O Alice é uma fonte auxiliar — não contém licitações, mas fornece dados essenciais que as outras fontes não têm.</p>
+
+    <div class="source-cards">
+      <div class="source-card">
+        <div class="source-card-header">
+          <div class="source-name">FaseExterna</div>
+          <span class="source-priority p1">1ª Prioridade</span>
+        </div>
+        <p>Novo portal ComprasGov. Cobre todas as modalidades de 2024+, exceto Inexigibilidade (modal. 7). Fonte mais completa e atualizada para licitações recentes.</p>
+        <span class="source-tag">db_compras.ComprasGov_FaseExterna.*</span>
+        <div style="margin-top:10px;font-size:11.5px;font-weight:300;color:var(--text-muted);line-height:1.55;padding:8px 10px;background:rgba(75,147,168,.06);border-radius:6px;border-left:2px solid var(--blue-bdr);">
+          ⚠️ Ainda sem separação de valores sigilosos em base dedicada — todos os valores ficam em <code>db_compras</code>, sigilosos ou não.
+        </div>
+      </div>
+      <div class="source-card">
+        <div class="source-card-header">
+          <div class="source-name">Comprasnet</div>
+          <span class="source-priority p2">2ª Prioridade</span>
+        </div>
+        <p>Portal legado. Pregão e RDC. Valores adjudicados obtidos via Siasg DW — a tabela <code>TBL_PROPOSTAITEM</code> não está disponível na CGU.</p>
+        <span class="source-tag">db_compras.comprasnet.*</span>
+        <span class="source-tag">db_compras_sigiloso.comprasnet.*</span>
+        <div style="margin-top:10px;font-size:11.5px;font-weight:300;color:var(--text-muted);line-height:1.55;padding:8px 10px;background:rgba(75,147,168,.06);border-radius:6px;border-left:2px solid var(--blue-bdr);">
+          <code>db_compras_sigiloso</code> contém os valores reais dos itens com orçamento sigiloso que ainda não passaram pela fase de lances — enquanto a disputa estiver aberta, esses valores ficam zerados em <code>db_compras</code>. Em estudo a inclusão futura de dados sigilosos do ComprasGov neste banco.
+        </div>
+      </div>
+      <div class="source-card">
+        <div class="source-card-header">
+          <div class="source-name">Siasg DW</div>
+          <span class="source-priority p3">3ª Prioridade</span>
+        </div>
+        <p><strong>Parou em abril/2024.</strong> Ainda é a fonte mais rica para itens históricos — CATMAT/CATSER completo, fornecedor vencedor com dimensões geográficas/jurídicas, quantidade de lances.</p>
+        <span class="source-tag">db_dwsiasg.dbo.*</span>
+      </div>
+      <div class="source-card">
+        <div class="source-card-header">
+          <div class="source-name">PNCP</div>
+          <span class="source-priority p4">4ª Prioridade</span>
+        </div>
+        <p>Única fonte atualizada para Dispensas e Inexigibilidades recentes. Usado apenas para registros que não existem nas 3 fontes anteriores.</p>
+        <span class="source-tag">db_pncp.dbo.*</span>
+      </div>
+      <div class="source-card" style="grid-column: 1 / -1;">
+        <div class="source-card-header">
+          <div class="source-name">Alice</div>
+          <span class="source-priority" style="background:var(--sage-bg);color:var(--sage-lt);border-color:var(--sage-bdr);">Auxiliar</span>
+        </div>
+        <p>Sistema de análise de licitações da CGU. Não é fonte de licitações em si — mas é o <strong style="color:var(--text);">único banco que possui datas de publicação</strong> confiáveis para cada versão da licitação, além de alertas de irregularidades e integração com tarefas no e-CGU (e-Aud).</p>
+        <span class="source-tag">db_alice_consulta.dbo.*</span>
+        <span class="source-tag">Sigilosa</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">1ª Prioridade — Licitações e Itens</div>
+    <h2 class="section-title">ComprasGov <em>FaseExterna</em></h2>
+    <p class="section-desc">Sistema atual do SERPRO. Cobre todas as modalidades exceto Inexigibilidade (modal. 7).</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tabela</th><th>Conteúdo</th></tr></thead>
+        <tbody>
+          <tr><td>compra</td><td>Licitações — dados gerais, situação, modalidade, valores, datas</td></tr>
+          <tr><td>item</td><td>Itens — estimativas, código CATMAT/CATSER, sigilo</td></tr>
+          <tr><td>proposta_item</td><td>Propostas dos fornecedores — lances, valores negociados</td></tr>
+          <tr><td>participacao</td><td>Participação dos fornecedores — identificação do vencedor</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>6 registros idênticos por licitação:</strong> A tabela <code>compra</code> não guarda histórico de versões. Usar sempre <code>ROW_NUMBER()</code> para deduplicar.</div>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Itens recriados com novos IDs (mesmo versao=0):</strong> Alterações significativas geram novos IDs com o mesmo <code>numero_item</code>. Sempre usar <code>ORDER BY versao DESC, id DESC</code> — correção aplicada em v2.0.9.</div>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Sigilo centralizado:</strong> Valores sigilosos ficam no mesmo banco (<code>db_compras</code>). O campo <code>orcamento_sigiloso = 'S'</code> apenas indica o sigilo — o valor está preenchido normalmente. Verificar periodicamente se a CGPLA mantém esta regra.</div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL — Deduplicação FaseExterna (padrão obrigatório)</span>
+      </div>
+      <pre><code><span class="fn">ROW_NUMBER</span>() <span class="kw">OVER</span> (
+    <span class="kw">PARTITION BY</span> i.numero_uasg, i.codigo_modalidade,
+                 i.numero_compra, i.ano_compra, i.numero_grupo, i.numero_item
+    <span class="kw">ORDER BY</span> i.versao <span class="kw">DESC</span>, i.id <span class="kw">DESC</span>  <span class="cm">-- id DESC é o desempate crítico (v2.0.9)</span>
+) <span class="kw">AS</span> rn</code></pre>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">2ª Prior. Licitações · 4ª Prior. Itens</div>
+    <h2 class="section-title"><em>Comprasnet</em></h2>
+    <p class="section-desc">Portal legado. Na CGU, disponível em duas bases separadas por sigilo.</p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL — União das bases sigilosa e não-sigilosa</span>
+      </div>
+      <pre><code><span class="cm">-- Itens com valor preenchido (não sigilosos ou já homologados)</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="tb">db_compras.comprasnet.tb_compras_mat</span>
+<span class="kw">WHERE</span> <span class="fn">ISNULL</span>(ipgValorRef, <span class="num">0</span>) &lt;&gt; <span class="num">0</span>
+
+<span class="kw">UNION ALL</span>
+
+<span class="cm">-- Itens sigilosos com valores reais</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="tb">db_compras_sigiloso.comprasnet.tb_compras_mat</span></code></pre>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>TBL_PROPOSTAITEM indisponível na CGU:</strong> A tabela com fornecedores adjudicados e valores por item não existe em <code>db_compras</code>. Por isso o Siasg DW é 2ª prioridade para itens — ele tem esses dados para licitações até abril/2024.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">3ª Prior. Licitações · 2ª Prior. Itens</div>
+    <h2 class="section-title">Siasg <em>DW</em></h2>
+
+    <div class="callout callout-error">
+      <span class="callout-icon">🛑</span>
+      <div><strong>Parado desde abril/2024.</strong> Situações temporárias (ex: Suspensa, código 119) podem estar desatualizadas. Usamos apenas situações permanentes: Revogada, Anulada, Cancelada e Homologada.</div>
+    </div>
+
+    <h3 class="sub-title">Dados exclusivos disponíveis nos itens do Siasg DW</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Dado</th><th>Tabela DW</th></tr></thead>
+        <tbody>
+          <tr><td>Código CATMAT/CATSER</td><td><code>D_ITCP_MATERIAL_SERVICO</code> via <code>f_item.ID_ITCP_TP_COD_MAT_SERV</code></td></tr>
+          <tr><td>Fornecedor vencedor (CNPJ, nome)</td><td><code>D_FRND_FORNECEDOR</code></td></tr>
+          <tr><td>UF, município, região do fornecedor</td><td>Dimensões de <code>D_FRND_FORNECEDOR</code></td></tr>
+          <tr><td>Porte e natureza jurídica</td><td>Tabela separada + <code>D_FRND_FORNECEDOR</code></td></tr>
+          <tr><td>Quantidade de lances por item</td><td><code>F_ITEM_COMPRA.QT_ITCP_LANCES_ITEM</code></td></tr>
+          <tr><td>Valor unitário e global estimado</td><td><code>VL_ITCP_PRECO_UNIT_ESTIM</code> / <code>VL_ITCP_PRECO_GLOBAL_ESTIM</code></td></tr>
+          <tr><td>Valor unitário e total homologado</td><td><code>F_ITEM_FORNECEDOR.VL_PRECO_UNIT_HOMOLOG</code> / <code>VL_PRECO_TOTAL_HOMOLOG</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>D_ITCP_MATERIAL_SERVICO sem chave única:</strong> O mesmo código pode existir como Material (<code>'M'</code>) e como Serviço (<code>'S'</code>). O JOIN deve desambiguar com <code>tipo_item_catalogo</code> — caso contrário duplica itens.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">4ª Prioridade — Apenas Disp./Inex.</div>
+    <h2 class="section-title"><em>PNCP</em></h2>
+    <p class="section-desc">Única fonte atualizada para Dispensas e Inexigibilidades recentes. Modalidades 8 e 9 no PNCP são normalizadas para os códigos 6 e 7 usados no restante do sistema.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Filtro</th><th>Condição</th></tr></thead>
+        <tbody>
+          <tr><td>Modalidade</td><td><code>modalidadeid IN (8, 9)</code> → normalizado para 6 e 7</td></tr>
+          <tr><td>Apenas ativos</td><td><code>excluido = 'f'</code></td></tr>
+          <tr><td>UASGs de SC</td><td>JOIN com <code>vw_jurisdicionadas_sc</code> via <code>unidadeorgao.codigounidade</code></td></tr>
+          <tr><td>Período</td><td><code>YEAR(datapublicacaopncp) >= 2022</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Campo <code>numerocompra</code> despadronizado:</strong> Pode conter valores como <code>"060301/2024"</code> ou <code>"DL 1"</code>. Sem impacto prático — o PNCP só é usado para registros inexistentes nas fontes anteriores, sem necessidade de JOIN por esse campo.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">5ª Fonte — Auxiliar</div>
+    <h2 class="section-title">Alice <em>e e-CGU</em></h2>
+    <p class="section-desc">O Alice não é fonte de licitações — fornece datas de publicação confiáveis (fonte preferencial) e alertas de irregularidades.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Dado</th><th>Uso</th></tr></thead>
+        <tbody>
+          <tr><td>data_primeira_publicacao</td><td>Data da versão 1 no Alice — preferencial em todas as fontes</td></tr>
+          <tr><td>data_ultima_publicacao</td><td>Data da versão mais recente</td></tr>
+          <tr><td>Alertas Alice</td><td>Vinculados via <code>licitacao_id</code> ou <code>pregao_id → licitacao_id</code></td></tr>
+          <tr><td>Integração e-CGU</td><td>Indica se o alerta gerou tarefa no sistema e-Aud</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Fallback de datas:</strong> Quando a licitação não existe no Alice, usa a data de inclusão da fonte. O campo <code>data_publicacao_fonte</code> indica a origem usada: <code>'ALICE'</code>, <code>'FASEEXTERNA'</code>, <code>'COMPRASNET'</code> ou <code>'SIASG'</code>.</div>
+    </div>
+  </div>
+
+</div>
+<footer class="page-footer">
+  <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
+  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+</footer>
+</body></html>

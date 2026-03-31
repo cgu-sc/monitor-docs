@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arquitetura — Monitor de Compras SC</title>
+  <link rel="stylesheet" href="style.css">
+<style>.richness-table td, .richness-table th { font-size: 12px !important; padding: 8px 12px !important; } .richness-table td:first-child { font-size: 11px !important; }</style>
+</head>
+<body>
+
+<header class="site-header">
+  <span class="header-doc-label">Documentação Técnica</span>
+  <a class="header-brand" href="index.html">
+    <div class="brand-meta">
+      <span class="brand-label">CGU · SC</span>
+      <span class="brand-title">Monitor <em>de</em> Compras</span>
+    </div>
+  </a>
+  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+</header>
+
+<nav class="tab-nav">
+  <a class="tab-link" href="index.html"><span class="tab-icon">⌂</span> Início</a>
+  <a class="tab-link" href="regras-negocio.html"><span class="tab-icon">≡</span> Regras de Negócio</a>
+  <a class="tab-link" href="fontes-de-dados.html"><span class="tab-icon">⬢</span> Fontes de Dados</a>
+  <a class="tab-link active" href="arquitetura.html"><span class="tab-icon">⬡</span> Arquitetura</a>
+  <a class="tab-link" href="camada-sql.html"><span class="tab-icon">&lt;/&gt;</span> Camada SQL</a>
+  <a class="tab-link" href="qualidade-dados.html"><span class="tab-icon">⚠</span> Qualidade de Dados</a>
+  <a class="tab-link" href="glossario.html"><span class="tab-icon">§</span> Glossário</a>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="page-top">
+    <div class="page-eyebrow">Documentação / Arquitetura Geral</div>
+    <h1 class="page-title">Arquitetura <em>Geral</em></h1>
+    <p class="page-subtitle">Pipeline de dados: bases brutas → SQL → Power BI · 5 camadas</p>
+  </div>
+
+  <!-- PIPELINE PRINCIPAL -->
+  <div class="section">
+    <span class="badge badge-hibrido">🔀 Técnico + Gerencial</span>
+    <div class="section-eyebrow">Visão Macro</div>
+    <h2 class="section-title">Pipeline de <em>Dados</em></h2>
+    <p class="section-desc">A arquitetura é organizada em cinco camadas com responsabilidades distintas. As setas âmbar indicam o fluxo entre camadas; as setas menores em azul-esverdeado indicam a sequência de prioridade dentro do pipeline de cada camada.</p>
+
+    <div class="pipeline-wrap">
+
+      <!-- 1ª Camada -->
+      <div class="pipe-layer">
+        <div class="pipe-layer-header">
+          <div class="pipe-layer-num" style="background:var(--blue-bg);border:1px solid var(--blue-bdr);color:var(--blue-lt);">1</div>
+          <div>
+            <div class="pipe-layer-title">Bases Brutas</div>
+            <div style="font-size:12px;font-weight:300;color:var(--text-muted);margin-top:2px;">SQL Server — sistemas federais de origem</div>
+          </div>
+          <span class="pipe-layer-sub">db_compras · db_dwsiasg · db_pncp · db_alice_consulta</span>
+        </div>
+        <div class="pipe-layer-body">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div class="pipe-view blue">db_compras.ComprasGov_FaseExterna.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">FaseExterna · 2024+</div></div>
+            <div class="pipe-view blue">db_compras.comprasnet.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">Comprasnet · Pregão/RDC</div></div>
+            <div class="pipe-view">db_compras_sigiloso.comprasnet.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">Valores sigilosos · Comprasnet</div></div>
+            <div class="pipe-view teal">db_dwsiasg.dbo.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">Siasg DW · até abr/2024</div></div>
+            <div class="pipe-view teal">db_pncp.dbo.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">PNCP · Disp./Inex.</div></div>
+            <div class="pipe-view">db_alice_consulta.dbo.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">Alice · Datas/Alertas</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-arrow-big">
+        <div class="arrow-line"></div>
+        <div class="arrow-head"></div>
+        <div class="pipe-arrow-label">UNION ALL + Deduplicação</div>
+      </div>
+
+      <!-- 2ª Camada -->
+      <div class="pipe-layer">
+        <div class="pipe-layer-header">
+          <div class="pipe-layer-num" style="background:var(--teal-bg);border:1px solid var(--teal-bdr);color:var(--teal-lt);">2</div>
+          <div>
+            <div class="pipe-layer-title">Views por Fonte</div>
+            <div style="font-size:12px;font-weight:300;color:var(--text-muted);margin-top:2px;">temp_CGUSC.compras — normalização e regras por sistema</div>
+          </div>
+          <span class="pipe-layer-sub">11 views · Licitações + Itens</span>
+        </div>
+        <div class="pipe-layer-body">
+          <div class="pipe-views-grid">
+
+            <!-- Pipeline licitações -->
+            <div class="pipe-col">
+              <div class="pipe-col-label" style="color:var(--blue);">Pipeline — Licitações</div>
+              <div class="pipe-view blue">vw_licitacoes_faseexterna_sc <span class="pipe-priority p1">1ª</span></div>
+              <div class="pipe-arrow-small-wrap"><div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;"><div style="width:1px;height:12px;background:var(--teal);opacity:.6;"></div><div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--teal);opacity:.75;"></div></div></div>
+              <div class="pipe-view">vw_licitacoes_comprasnet_sc <span class="pipe-priority p2">2ª</span></div>
+              <div class="pipe-arrow-small-wrap"><div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;"><div style="width:1px;height:12px;background:var(--teal);opacity:.6;"></div><div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--teal);opacity:.75;"></div></div></div>
+              <div class="pipe-view teal">vw_licitacoes_siasg_sc <span class="pipe-priority p3">3ª</span></div>
+              <div class="pipe-arrow-small-wrap"><div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;"><div style="width:1px;height:12px;background:var(--teal);opacity:.6;"></div><div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--teal);opacity:.75;"></div></div></div>
+              <div class="pipe-view">vw_disp_inex_pncp_sc <span class="pipe-priority p4">4ª · Disp./Inex.</span></div>
+            </div>
+
+            <!-- Pipeline itens -->
+            <div class="pipe-col">
+              <div class="pipe-col-label" style="color:var(--teal);">Pipeline — Itens</div>
+              <div class="pipe-view blue">vw_itens_faseexterna_sc <span class="pipe-priority p1">1ª</span></div>
+              <div class="pipe-arrow-small-wrap"><div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;"><div style="width:1px;height:12px;background:var(--teal);opacity:.6;"></div><div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--teal);opacity:.75;"></div></div></div>
+              <div class="pipe-view teal">vw_itens_siasg_sc <span class="pipe-priority p3">2ª</span></div>
+              <div class="pipe-arrow-small-wrap"><div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;"><div style="width:1px;height:12px;background:var(--teal);opacity:.6;"></div><div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--teal);opacity:.75;"></div></div></div>
+              <div class="pipe-view" style="font-size:11px;">vw_itens_consolidada_sc <span style="font-size:9px;opacity:.6;">(PNCP via consolidada)</span> <span class="pipe-priority p4">3ª</span></div>
+              <div class="pipe-arrow-small-wrap"><div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;"><div style="width:1px;height:12px;background:var(--teal);opacity:.6;"></div><div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--teal);opacity:.75;"></div></div></div>
+              <div class="pipe-view">vw_itens_comprasnet_sc <span class="pipe-priority p2">4ª</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-arrow-big">
+        <div class="arrow-line"></div>
+        <div class="arrow-head"></div>
+        <div class="pipe-arrow-label">Anti-joins por Cod_licitacao</div>
+      </div>
+
+      <!-- 3ª Camada -->
+      <div class="pipe-layer">
+        <div class="pipe-layer-header">
+          <div class="pipe-layer-num" style="background:var(--amber-bg);border:1px solid var(--amber-bdr);color:var(--amber-lt);">3</div>
+          <div>
+            <div class="pipe-layer-title">Views Consolidadas</div>
+            <div style="font-size:12px;font-weight:300;color:var(--text-muted);margin-top:2px;">UNION ALL com anti-joins — cada licitação/item aparece uma única vez</div>
+          </div>
+        </div>
+        <div class="pipe-layer-body">
+          <div style="display:flex;gap:14px;flex-wrap:wrap;">
+            <div class="pipe-view blue" style="flex:1;min-width:260px;">vw_licitacoes_consolidada_sc<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">View principal · Licitações + Disp./Inex.</div></div>
+            <div class="pipe-view teal" style="flex:1;min-width:260px;">vw_itens_consolidada_sc<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">View principal · Itens de todas as fontes</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-arrow-big">
+        <div class="arrow-line"></div>
+        <div class="arrow-head"></div>
+        <div class="pipe-arrow-label">Censura de Sigilo + Otimização de Performance</div>
+      </div>
+
+      <!-- 4ª Camada -->
+      <div class="pipe-layer">
+        <div class="pipe-layer-header">
+          <div class="pipe-layer-num" style="background:var(--amber-bg);border:1px solid var(--amber-bdr);color:var(--amber-lt);">4</div>
+          <div>
+            <div class="pipe-layer-title">Stored Procedure</div>
+            <div style="font-size:12px;font-weight:300;color:var(--text-muted);margin-top:2px;">+1h → ~5–8 min · 10 campos monetários censurados</div>
+          </div>
+        </div>
+        <div class="pipe-layer-body">
+          <div class="pipe-view amber" style="max-width:420px;">sp_itens_licitacoes_pbi<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">#temp_censura como barreira de otimização do SQL Server</div></div>
+        </div>
+      </div>
+
+      <div class="pipe-arrow-big">
+        <div class="arrow-line"></div>
+        <div class="arrow-head"></div>
+        <div class="pipe-arrow-label">Power Query · Modo Importação</div>
+      </div>
+
+      <!-- 5ª Camada -->
+      <div class="pipe-layer">
+        <div class="pipe-layer-header">
+          <div class="pipe-layer-num" style="background:var(--sage-bg);border:1px solid var(--sage-bdr);color:var(--sage-lt);">5</div>
+          <div>
+            <div class="pipe-layer-title">Power BI</div>
+            <div style="font-size:12px;font-weight:300;color:var(--text-muted);margin-top:2px;">Tabelas do modelo de dados</div>
+          </div>
+        </div>
+        <div class="pipe-layer-body">
+          <div style="display:flex;gap:14px;flex-wrap:wrap;">
+            <div class="pipe-view" style="flex:1;min-width:200px;border-color:var(--sage-bdr);color:var(--sage-lt);background:var(--sage-bg);">LicitacoesConsol<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">Consulta_LicitacoesSC_PBI</div></div>
+            <div class="pipe-view" style="flex:1;min-width:200px;border-color:var(--sage-bdr);color:var(--sage-lt);background:var(--sage-bg);">ItensConsol<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">sp_itens_licitacoes_pbi</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /pipeline-wrap -->
+  </div>
+
+  <!-- ANTI-JOINS -->
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">Camada 3 — Detalhe</div>
+    <h2 class="section-title">Anti-joins e <em>Consolidação</em></h2>
+    <p class="section-desc">Cada fonte inclui apenas os registros que não existem nas fontes de maior prioridade, garantindo unicidade sem perda de dados.</p>
+
+    <div class="anti-join-note">
+      <strong>Lógica de vw_licitacoes_consolidada_sc:</strong><br><br>
+      1. <strong>FaseExterna</strong> — inclui tudo.<br>
+      2. <strong>Comprasnet</strong> — inclui apenas licitações cujo <code>Cod_licitacao</code> não existe no FaseExterna.<br>
+      3. <strong>Siasg DW</strong> — inclui apenas licitações que não existem no FaseExterna nem no Comprasnet.<br>
+      4. <strong>PNCP</strong> — inclui apenas Dispensas/Inexigibilidades que não existem nas 3 fontes anteriores.
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Anti-join de itens a nível de licitação:</strong> Se a licitação existe no FaseExterna, todos os seus itens vêm exclusivamente do FaseExterna — mesmo que ele não tenha itens carregados (~2% dos casos).</div>
+    </div>
+  </div>
+
+  <!-- RIQUEZA DOS ITENS §17 -->
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">Camada 2 — Itens · Detalhamento</div>
+    <h2 class="section-title">Riqueza dos Dados de <em>Itens por Fonte</em></h2>
+    <p class="section-desc">A hierarquia de prioridade para itens é diferente da de licitações porque a disponibilidade de dados varia significativamente entre as fontes.</p>
+
+    <div class="table-wrap richness-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Prior.</th>
+            <th>Fonte</th>
+            <th>Classif. CATMAT/CATSER</th>
+            <th>Fornecedor Vencedor</th>
+            <th>Valores Adjudicados</th>
+            <th>Qtd Lances</th>
+            <th>Qtd Fornecedores</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="source-priority p1" style="font-size:9px;">1ª</span></td>
+            <td style="color:var(--blue-lt);font-weight:600;">FaseExterna</td>
+            <td class="richness-yes">✅ Via codigo_item_catalogo → DW</td>
+            <td class="richness-yes">✅ proposta_item + participacao</td>
+            <td class="richness-yes">✅ Hierarquia 4 valores</td>
+            <td class="richness-no">❌ Não disponível</td>
+            <td class="richness-yes">✅ COUNT(proposta_item)</td>
+          </tr>
+          <tr>
+            <td><span class="source-priority p3" style="font-size:9px;">2ª</span></td>
+            <td style="color:var(--teal-lt);font-weight:600;">Siasg DW</td>
+            <td class="richness-yes">✅ D_ITCP_MATERIAL_SERVICO</td>
+            <td class="richness-yes">✅ D_FRND_FORNECEDOR + dimensões</td>
+            <td class="richness-yes">✅ VL_PRECO_UNIT/TOTAL_HOMOLOG</td>
+            <td class="richness-yes">✅ QT_ITCP_LANCES_ITEM</td>
+            <td class="richness-yes">✅ COUNT(F_ITEM_FORNECEDOR)</td>
+          </tr>
+          <tr>
+            <td><span class="source-priority p4" style="font-size:9px;">3ª</span></td>
+            <td style="color:var(--text-mid);">PNCP</td>
+            <td class="richness-no">❌ Não disponível</td>
+            <td class="richness-part">⚠️ Parcial — compraitemresultado</td>
+            <td class="richness-yes">✅ qtdHomologada × valorUnit.</td>
+            <td class="richness-no">❌</td>
+            <td class="richness-no">❌</td>
+          </tr>
+          <tr>
+            <td><span class="source-priority p2" style="font-size:9px;">4ª</span></td>
+            <td style="color:var(--text-muted);">Comprasnet</td>
+            <td class="richness-part">⚠️ Parcial — grupo/classe</td>
+            <td class="richness-no">❌ TBL_PROPOSTAITEM indisponível na CGU</td>
+            <td class="richness-no">❌ Sem acesso a propostas</td>
+            <td class="richness-no">❌</td>
+            <td class="richness-no">❌</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div>
+        <strong>Por que Siasg DW é 2ª para itens, mas 3ª para licitações?</strong><br>
+        Para <em>licitações</em>, o Comprasnet ocupa a 2ª posição por ter dados estruturais mais recentes (situação, datas) que o Siasg, que parou em abril/2024. Para <em>itens</em>, o Siasg DW é superior: tem classificação completa CATMAT/CATSER e dados do fornecedor vencedor — dados que o <code>db_compras</code> da CGU não oferece por não ter a <code>TBL_PROPOSTAITEM</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- SP + POWER BI -->
+  <div class="section">
+    <span class="badge badge-hibrido">🔀 Técnico + Gerencial</span>
+    <div class="section-eyebrow">Camadas 4 e 5</div>
+    <h2 class="section-title">Stored Procedure + <em>Power BI</em></h2>
+    <p class="section-desc">A stored procedure resolve dois problemas da <strong>consulta de itens de licitações</strong> simultaneamente: performance (de +1h para ~5–8 min) e censura de sigilo nos 10 campos monetários.</p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL — Lógica da SP</span>
+        <span class="code-label">sp_itens_licitacoes_pbi</span>
+      </div>
+      <pre><code><span class="cm">-- Passo 1: materializa campos de censura (~3 min, plano isolado)</span>
+<span class="kw">SELECT</span> Cod_licitacao, Situacao_Gerada, qtd_itens_sigilosos,
+       data_primeira_publicacao, data_abertura
+<span class="kw">INTO</span> #temp_censura <span class="kw">FROM</span> <span class="tb">vw_licitacoes_consolidada_sc</span>
+
+<span class="kw">CREATE INDEX</span> ix_censura <span class="kw">ON</span> #temp_censura (Cod_licitacao)
+
+<span class="cm">-- Passo 2: JOIN com itens — plano completamente independente (~2 min)</span>
+<span class="kw">SELECT</span> i.*,
+  <span class="kw">CASE WHEN</span> c.Situacao_Gerada = <span class="str">'Não Homologada'</span>
+         <span class="kw">AND</span> c.qtd_itens_sigilosos &gt; <span class="num">0</span>
+  <span class="kw">THEN</span> <span class="num">0</span> <span class="kw">ELSE</span> i.valor_estimado_calculado <span class="kw">END</span>
+  <span class="cm">-- [+ 9 outros campos monetários censurados da mesma forma]</span>
+<span class="kw">FROM</span> <span class="tb">vw_itens_consolidada_sc</span> i
+<span class="kw">JOIN</span> #temp_censura c <span class="kw">ON</span> i.Cod_licitacao = c.Cod_licitacao</code></pre>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Por que a tabela temporária resolve o timeout?</strong> O SQL Server trata views como transparentes e expande o plano completo ao fazer JOIN direto entre as duas views consolidadas. A <code>#temp_censura</code> força planos de execução separados, reduzindo de +1h para ~5–8 min no total.</div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tabela PBI</th><th>Fonte SQL</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td>LicitacoesConsol</td><td>Consulta_LicitacoesSC_PBI</td><td>Todas as licitações e dispensas/inexig.</td></tr>
+          <tr><td>ItensConsol</td><td>sp_itens_licitacoes_pbi</td><td>Itens com sigilo já censurado</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+<footer class="page-footer">
+  <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
+  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+</footer>
+</body></html>

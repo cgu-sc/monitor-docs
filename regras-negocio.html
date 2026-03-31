@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regras de Negócio — Monitor de Compras SC</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <span class="header-doc-label">Documentação Técnica</span>
+  <a class="header-brand" href="index.html">
+    <div class="brand-meta">
+      <span class="brand-label">CGU · SC</span>
+      <span class="brand-title">Monitor <em>de</em> Compras</span>
+    </div>
+  </a>
+  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+</header>
+
+<nav class="tab-nav">
+  <a class="tab-link" href="index.html"><span class="tab-icon">⌂</span> Início</a>
+  <a class="tab-link active" href="regras-negocio.html"><span class="tab-icon">≡</span> Regras de Negócio</a>
+  <a class="tab-link" href="fontes-de-dados.html"><span class="tab-icon">⬢</span> Fontes de Dados</a>
+  <a class="tab-link" href="arquitetura.html"><span class="tab-icon">⬡</span> Arquitetura</a>
+  <a class="tab-link" href="camada-sql.html"><span class="tab-icon">&lt;/&gt;</span> Camada SQL</a>
+  <a class="tab-link" href="qualidade-dados.html"><span class="tab-icon">⚠</span> Qualidade de Dados</a>
+  <a class="tab-link" href="glossario.html"><span class="tab-icon">§</span> Glossário</a>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="page-top">
+    <div class="page-eyebrow">Documentação / Regras de Negócio</div>
+    <h1 class="page-title">Regras de <em>Negócio</em></h1>
+    <p class="page-subtitle">v2.0.9 · Março/2026 — Cálculos de valores, situações, sigilo e mapeamentos</p>
+  </div>
+
+  <!-- Cod_licitacao -->
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">Identificação</div>
+    <h2 class="section-title">Identificador Único <em>Cod_licitacao</em></h2>
+    <p class="section-desc">Campo calculado de 17 dígitos que identifica cada licitação de forma única no sistema consolidado, permitindo cruzamento entre fontes.</p>
+
+    <div style="background:rgba(0,0,0,.25);border:1px solid var(--blue-bdr);border-radius:var(--rlg);padding:28px;text-align:center;margin:20px 0;">
+      <div style="font-family:var(--f-mono);font-size:22px;letter-spacing:4px;margin-bottom:14px;">
+        <span style="color:var(--blue-lt);">030111</span><span style="color:var(--text-muted);">·</span><span style="color:var(--teal-lt);">05</span><span style="color:var(--text-muted);">·</span><span style="color:var(--text);">000502022</span>
+      </div>
+      <div style="display:flex;justify-content:center;gap:32px;font-family:var(--f-mono);font-size:9.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">
+        <span><span style="color:var(--blue-lt);">■</span> UASG (6 dígitos)</span>
+        <span><span style="color:var(--teal-lt);">■</span> Modalidade (2 dígitos)</span>
+        <span><span style="color:var(--text);">■</span> Número + Ano (9 dígitos)</span>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><span class="code-lang">SQL — FaseExterna</span></div>
+      <pre><code><span class="fn">CONCAT</span>(
+    <span class="fn">RIGHT</span>(<span class="fn">REPLICATE</span>(<span class="str">'0'</span>,<span class="num">6</span>) + <span class="fn">CAST</span>(numero_uasg <span class="kw">AS</span> VARCHAR), <span class="num">6</span>),
+    <span class="fn">RIGHT</span>(<span class="fn">REPLICATE</span>(<span class="str">'0'</span>,<span class="num">2</span>) + <span class="fn">CAST</span>(codigo_modalidade <span class="kw">AS</span> VARCHAR), <span class="num">2</span>),
+    <span class="fn">RIGHT</span>(<span class="fn">REPLICATE</span>(<span class="str">'0'</span>,<span class="num">5</span>) + <span class="fn">CAST</span>(numero_compra <span class="kw">AS</span> VARCHAR), <span class="num">5</span>),
+    <span class="fn">RIGHT</span>(<span class="fn">CAST</span>(ano_compra <span class="kw">AS</span> VARCHAR), <span class="num">4</span>)
+)</code></pre>
+    </div>
+  </div>
+
+  <!-- Valores estimados -->
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">Cálculos</div>
+    <h2 class="section-title">Valores <em>Estimados</em></h2>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Correção crítica v2.0.8:</strong> O campo <code>item.valor_estimado</code> no FaseExterna é <strong>sempre unitário</strong>, independente de a compra ser Normal ou SRP. A lógica anterior (v2.0–v2.0.7) estava incorreta e subestimava valores em licitações Normais com quantidade &gt; 1.</div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fonte</th><th>Campo</th><th>Natureza</th><th>Fórmula SQL</th></tr></thead>
+        <tbody>
+          <tr><td>FaseExterna</td><td>item.valor_estimado</td><td>Sempre unitário</td><td><code>COALESCE(qtd, 1) * COALESCE(valor_estimado, 0)</code></td></tr>
+          <tr><td>Comprasnet (SRP)</td><td>ipgValorRef</td><td>Unitário</td><td><code>COALESCE(quantidade, 1) * COALESCE(ipgValorRef, 0)</code></td></tr>
+          <tr><td>Comprasnet (Normal)</td><td>ipgValorRef</td><td>Global (total)</td><td><code>COALESCE(ipgValorRef, 0)</code></td></tr>
+          <tr><td>Siasg DW</td><td>VL_ITCP_PRECO_GLOBAL_ESTIM</td><td>Sempre global</td><td><code>COALESCE(VL_ITCP_PRECO_GLOBAL_ESTIM, 0)</code></td></tr>
+          <tr><td>PNCP</td><td>valorunitarioestimado</td><td>Sempre unitário</td><td><code>quantidade * valorunitarioestimado</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Valores adjudicados -->
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">Cálculos</div>
+    <h2 class="section-title">Valores <em>Adjudicados</em></h2>
+
+    <h3 class="sub-title">FaseExterna — hierarquia de 4 valores</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nível</th><th>Campo</th><th>Quando Usado</th></tr></thead>
+        <tbody>
+          <tr><td>1º</td><td>valor_negociado_julgamento_calculado</td><td>Pós-negociação — sempre que disponível</td></tr>
+          <tr><td>2º</td><td>valor_lance_calculado</td><td>Pós-disputa, sem negociação</td></tr>
+          <tr><td>3º</td><td>melhor_valor_proposta_lance_calculado</td><td>Fallback geral</td></tr>
+          <tr><td>4º</td><td>valor_proposta_calculado</td><td>Concorrências fechadas (sem lance) — adicionado v2.0.9</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Correção v2.0.9 — item.homologado removido:</strong> Nas versões anteriores, <code>item.homologado = 'S'</code> era condição obrigatória. Análise empírica revelou 35% de falsos negativos — 159.943 de 456.276 licitações homologadas tinham propostas adjudicadas com <code>item.homologado = 'N'</code>. A condição suficiente e confiável é <code>proposta.situacao = '6'</code>.</div>
+    </div>
+
+    <h3 class="sub-title">Comprasnet — via Siasg DW</h3>
+    <p class="section-desc" style="margin-bottom:0;">O Comprasnet da CGU não tem <code>TBL_PROPOSTAITEM</code>. O valor adjudicado vem do Siasg DW (<code>VL_PRECO_TOTAL_HOMOLOG</code>). Para licitações do Comprasnet posteriores a abril/2024, não há valor disponível.</p>
+  </div>
+
+  <!-- Situação -->
+  <div class="section">
+    <span class="badge badge-hibrido">🔀 Técnico + Gerencial</span>
+    <div class="section-eyebrow">Situação</div>
+    <h2 class="section-title">Situação da <em>Licitação</em></h2>
+
+    <div class="feat-grid">
+      <div class="feat-card feat-blue">
+        <span class="feat-icon">📋</span>
+        <div class="feat-title">Situacao_Fonte</div>
+        <p class="feat-text">Situação oficial cadastrada na base. Varia por fonte (ex: código <code>'PD'</code> no FaseExterna, numérico no Siasg). Exibida no painel como informação bruta.</p>
+      </div>
+      <div class="feat-card feat-amber">
+        <span class="feat-icon">⚙️</span>
+        <div class="feat-title">Situacao_Gerada</div>
+        <p class="feat-text">Calculada e normalizada pelas views. Usada para as regras de censura de sigilo e filtros no Power BI.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Situacao_Gerada</th><th>Descrição</th><th>Aplica Censura?</th></tr></thead>
+        <tbody>
+          <tr><td>Homologada</td><td>Concluída com sucesso</td><td>❌ Não</td></tr>
+          <tr><td>Revogada / Anulada / Cancelada</td><td>Encerrada por decisão</td><td>❌ Não</td></tr>
+          <tr><td>Suspensa / Fracassada / Deserta</td><td>Estado específico (FaseExterna)</td><td>❌ Não</td></tr>
+          <tr style="background:var(--amber-bg);"><td><strong>Não Homologada</strong></td><td><strong>Em andamento</strong></td><td>✅ <strong>Sim</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sigilo -->
+  <div class="section">
+    <span class="badge badge-gerencial">📊 Gerencial</span>
+    <div class="section-eyebrow">Sigilo</div>
+    <h2 class="section-title">Censura de <em>Sigilo</em></h2>
+    <p class="section-desc">Censurar valores apenas quando <code>Situacao_Gerada = 'Não Homologada'</code> E a licitação possui itens sigilosos. Quando a licitação termina (qualquer outra situação), o sigilo é liberado.</p>
+
+    <h3 class="sub-title">Faixas de valor exibidas no painel</h3>
+    <div class="value-faixas">
+      <div class="faixa-row"><span class="faixa-range">= 0 ou NULL</span><span class="faixa-label">0,00</span></div>
+      <div class="faixa-row"><span class="faixa-range">0 &lt; valor ≤ 150.000</span><span class="faixa-label">Até 150 mil</span></div>
+      <div class="faixa-row"><span class="faixa-range">150.000 &lt; valor ≤ 1.000.000</span><span class="faixa-label">De 150 mil a 1 milhão</span></div>
+      <div class="faixa-row"><span class="faixa-range">1.000.000 &lt; valor ≤ 2.000.000</span><span class="faixa-label">De 1 a 2 milhões</span></div>
+      <div class="faixa-row"><span class="faixa-range">2.000.000 &lt; valor ≤ 5.000.000</span><span class="faixa-label">De 2 a 5 milhões</span></div>
+      <div class="faixa-row"><span class="faixa-range">5.000.000 &lt; valor ≤ 10.000.000</span><span class="faixa-label">De 5 a 10 milhões</span></div>
+      <div class="faixa-row"><span class="faixa-range">valor &gt; 10.000.000</span><span class="faixa-label">Acima de 10 milhões</span></div>
+    </div>
+  </div>
+
+  <!-- Modalidades -->
+  <div class="section">
+    <span class="badge badge-gerencial">📊 Gerencial</span>
+    <div class="section-eyebrow">Domínio</div>
+    <h2 class="section-title"><em>Modalidades</em></h2>
+    <p class="section-desc">No painel, modalidades 6 (Dispensa) e 7 (Inexigibilidade) são filtradas separadamente das licitações propriamente ditas.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Código</th><th>Modalidade</th><th>FaseExterna</th><th>Comprasnet</th><th>Siasg</th><th>PNCP</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Convite</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+          <tr><td>3</td><td>Concorrência</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+          <tr><td>5</td><td>Pregão</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+          <tr style="background:var(--blue-bg);"><td><strong>6</strong></td><td><strong>Dispensa</strong></td><td>✅</td><td>✅</td><td>✅</td><td>✅ (cód. 8)</td></tr>
+          <tr style="background:var(--blue-bg);"><td><strong>7</strong></td><td><strong>Inexigibilidade</strong></td><td>—</td><td>✅</td><td>✅</td><td>✅ (cód. 9)</td></tr>
+          <tr><td>20</td><td>Concurso</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+          <tr><td>99</td><td>RDC</td><td>—</td><td>✅</td><td>—</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>DAX:</strong> Use <code>Modalidade IN (6, 7)</code> para Dispensas/Inexigibilidades. O campo <code>Possui_Sigilo</code> retorna as strings <code>'SIM'</code> ou <code>'NÃO'</code> — comparar como string nas medidas.</div>
+    </div>
+  </div>
+
+  <!-- Mapeamentos -->
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">Mapeamentos</div>
+    <h2 class="section-title">Domínios entre <em>Fontes</em></h2>
+
+    <h3 class="sub-title">Modo de Disputa</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>FaseExterna</th><th>Comprasnet (Pregão)</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td>A</td><td>1</td><td>Aberto</td></tr>
+          <tr><td>AF</td><td>3</td><td>Aberto/Fechado</td></tr>
+          <tr><td>F</td><td>—</td><td>Fechado (só FaseExterna)</td></tr>
+          <tr><td>FA</td><td>—</td><td>Fechado/Aberto (só FaseExterna)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub-title">Característica — SRP</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>FaseExterna (caracteristica)</th><th>Comprasnet (srp)</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td>'1'</td><td>'N'</td><td>Normal / Tradicional</td></tr>
+          <tr><td>'2'</td><td>'S'</td><td>SRP — Sistema de Registro de Preços</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- LINK PARA DOCUMENTO COMPLETO -->
+  <div class="section">
+    <div style="background:linear-gradient(135deg,var(--bg-card) 0%,var(--bg-card-hi) 100%);border:1px solid var(--bdr-blue);border-radius:var(--rlg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+      <div>
+        <div style="font-family:var(--f-mono);font-size:9.5px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:8px;">Documentação Completa</div>
+        <div style="font-family:var(--f-ui);font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;">REGRAS_DE_NEGOCIO.md</div>
+        <p style="font-size:13.5px;font-weight:300;color:var(--text-muted);line-height:1.6;max-width:480px;margin:0;">Esta página apresenta um resumo das principais regras. O documento completo de especificação técnica contém todas as seções detalhadas, tabelas de análise empírica e histórico completo de alterações.</p>
+      </div>
+      <a href="REGRAS_DE_NEGOCIO.md" style="display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:white;text-decoration:none;padding:12px 22px;border-radius:var(--r);font-family:var(--f-ui);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;transition:background .18s;" onmouseover="this.style.background='var(--blue-dim)'" onmouseout="this.style.background='var(--blue)'" target="_blank">
+        <span style="font-size:16px;">📄</span>
+        Ver documento completo →
+      </a>
+    </div>
+  </div>
+
+</div>
+<footer class="page-footer">
+  <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
+  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+</footer>
+</body></html>

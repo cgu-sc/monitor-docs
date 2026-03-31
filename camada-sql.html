@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camada SQL — Monitor de Compras SC</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <span class="header-doc-label">Documentação Técnica</span>
+  <a class="header-brand" href="index.html">
+    <div class="brand-meta">
+      <span class="brand-label">CGU · SC</span>
+      <span class="brand-title">Monitor <em>de</em> Compras</span>
+    </div>
+  </a>
+  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+</header>
+
+<nav class="tab-nav">
+  <a class="tab-link" href="index.html"><span class="tab-icon">⌂</span> Início</a>
+  <a class="tab-link" href="regras-negocio.html"><span class="tab-icon">≡</span> Regras de Negócio</a>
+  <a class="tab-link" href="fontes-de-dados.html"><span class="tab-icon">⬢</span> Fontes de Dados</a>
+  <a class="tab-link" href="arquitetura.html"><span class="tab-icon">⬡</span> Arquitetura</a>
+  <a class="tab-link active" href="camada-sql.html"><span class="tab-icon">&lt;/&gt;</span> Camada SQL</a>
+  <a class="tab-link" href="qualidade-dados.html"><span class="tab-icon">⚠</span> Qualidade de Dados</a>
+  <a class="tab-link" href="glossario.html"><span class="tab-icon">§</span> Glossário</a>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="page-top">
+    <div class="page-eyebrow">Documentação / Camada SQL</div>
+    <h1 class="page-title">Camada <em>SQL</em></h1>
+    <p class="page-subtitle">Views e stored procedure — numerados pela ordem de dependência</p>
+  </div>
+
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <p class="section-desc">Todos os objetos residem no schema <code>temp_CGUSC.compras</code>. A hierarquia de arquivos segue a ordem de dependência: views por fonte → views consolidadas → stored procedure.</p>
+  </div>
+
+  <!-- VIEWS DE LICITAÇÕES -->
+  <div class="section">
+    <div class="section-eyebrow">Licitações</div>
+    <h2 class="section-title">Views de <em>Licitações</em></h2>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div>
+          <div class="view-name">vw_licitacoes_faseexterna_sc</div>
+          <div class="view-file">02_-_vw_licitacoes_faseexterna_sc.sql</div>
+        </div>
+        <div class="view-badges">
+          <span class="view-source">FaseExterna</span>
+          <span class="source-priority p1">1ª</span>
+        </div>
+      </div>
+      <div class="view-body">
+        <p>Licitações do FaseExterna com deduplicação, cálculo de valores estimados/adjudicados agregados dos itens, e JOINs com Alice para datas de publicação confiáveis.</p>
+        <h3 class="sub-title" style="margin-top:16px;">CTEs internas</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>CTE</th><th>Propósito</th></tr></thead>
+            <tbody>
+              <tr><td>compras_recentes</td><td>Deduplicação — <code>ROW_NUMBER ORDER BY versao DESC, id DESC</code></td></tr>
+              <tr><td>itens_recentes</td><td>Deduplicação de itens com mesma lógica</td></tr>
+              <tr><td>valores_agregados</td><td>SUM de <code>valor_estimado_calculado</code> e <code>valor_adjudicado_calculado</code> por licitação</td></tr>
+              <tr><td>alice_primeira / alice_ultima</td><td>Data da primeira e última publicação no Alice</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 class="sub-title">Campos principais</h3>
+        <div class="field-list">
+          <span class="field-item">Cod_licitacao</span><span class="field-item">UASG</span><span class="field-item">Modalidade</span>
+          <span class="field-item">data_primeira_publicacao</span><span class="field-item">data_publicacao_fonte</span><span class="field-item">data_abertura</span>
+          <span class="field-item">Situacao_Fonte</span><span class="field-item">Situacao_Gerada</span><span class="field-item">homologada</span>
+          <span class="field-item">valor_estimado_total</span><span class="field-item">valor_adjudicado_total</span>
+          <span class="field-item">qtd_itens_sigilosos</span><span class="field-item">fonte_dados='FASEEXTERNA'</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div>
+          <div class="view-name">vw_licitacoes_comprasnet_sc</div>
+          <div class="view-file">03_-_vw_licitacoes_comprasnet_sc.sql</div>
+        </div>
+        <div class="view-badges"><span class="view-source">Comprasnet</span><span class="source-priority p2">2ª</span></div>
+      </div>
+      <div class="view-body">
+        <p>Licitações do Comprasnet. Obtém situação e valores homologados via JOIN com <code>vw_siasg_situacao_sc</code>. Para licitações do Comprasnet posteriores a abril/2024, não há valor homologado disponível (Siasg DW parado).</p>
+      </div>
+    </div>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div>
+          <div class="view-name">vw_licitacoes_siasg_sc</div>
+          <div class="view-file">04_-_vw_licitacoes_siasg_sc.sql</div>
+        </div>
+        <div class="view-badges"><span class="view-source">Siasg DW</span><span class="source-priority p3">3ª</span></div>
+      </div>
+      <div class="view-body">
+        <p>Licitações do Siasg que não existem no FaseExterna nem no Comprasnet. Inclui apenas situações permanentes. Usa <code>DT_CMPR_RESULTADO_COMPRA</code> como fallback de data (0% de inválidos vs 88% do <code>DT_PUBLICACAO_DOU</code> para Disp./Inex.).</p>
+      </div>
+    </div>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div>
+          <div class="view-name">vw_disp_inex_pncp_sc</div>
+          <div class="view-file">05_-_vw_disp_inex_pncp_sc.sql</div>
+        </div>
+        <div class="view-badges"><span class="view-source">PNCP</span><span class="source-priority p4">4ª</span></div>
+      </div>
+      <div class="view-body">
+        <p>Dispensas (modal. 6) e Inexigibilidades (modal. 7) do PNCP que não existem nas fontes anteriores. Normaliza códigos (8→6, 9→7) e calcula valores via <code>quantidade × valorunitarioestimado</code>.</p>
+      </div>
+    </div>
+
+    <div class="view-item highlight">
+      <div class="view-header">
+        <div>
+          <div class="view-name primary">vw_licitacoes_consolidada_sc</div>
+          <div class="view-file">06_-_vw_licitacoes_consolidada_sc.sql · <strong>View principal</strong></div>
+        </div>
+        <div class="view-badges"><span class="view-source blue">CONSOLIDADA</span></div>
+      </div>
+      <div class="view-body">
+        <p>UNION ALL das quatro fontes com anti-joins. Cada licitação aparece exatamente uma vez, pela fonte de maior prioridade.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">SQL — UNION ALL com Anti-joins</span></div>
+          <pre><code><span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="tb">vw_licitacoes_faseexterna_sc</span>
+<span class="kw">UNION ALL</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="tb">vw_licitacoes_comprasnet_sc</span> c
+<span class="kw">WHERE NOT EXISTS</span> (<span class="kw">SELECT</span> <span class="num">1</span> <span class="kw">FROM</span> <span class="tb">vw_licitacoes_faseexterna_sc</span> f <span class="kw">WHERE</span> f.Cod_licitacao = c.Cod_licitacao)
+<span class="kw">UNION ALL</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="tb">vw_licitacoes_siasg_sc</span> s
+<span class="kw">WHERE NOT EXISTS</span> (...faseexterna...) <span class="kw">AND NOT EXISTS</span> (...comprasnet...)
+<span class="kw">UNION ALL</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="tb">vw_disp_inex_pncp_sc</span> p
+<span class="kw">WHERE NOT EXISTS</span> (...3 fontes anteriores...)</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEWS DE ITENS -->
+  <div class="section">
+    <div class="section-eyebrow">Itens</div>
+    <h2 class="section-title">Views de <em>Itens</em></h2>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div>
+          <div class="view-name">vw_itens_faseexterna_sc</div>
+          <div class="view-file">07_-_vw_itens_faseexterna_sc.sql</div>
+        </div>
+        <div class="view-badges"><span class="view-source">FaseExterna</span><span class="source-priority p1">1ª (Itens)</span></div>
+      </div>
+      <div class="view-body">
+        <p>Itens com fornecedor vencedor (via <code>proposta_item</code> e <code>participacao</code>), valores calculados e classificação CATMAT/CATSER via JOIN com Siasg DW.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">SQL — Hierarquia de 4 valores adjudicados (v2.0.9)</span></div>
+          <pre><code><span class="cm">-- Condição: item ativo (situacao='1') E proposta adjudicada (situacao='6')</span>
+<span class="cm">-- item.homologado removido (v2.0.9) — campo não confiável, 35% falsos negativos</span>
+<span class="kw">CASE WHEN</span> i.situacao = <span class="str">'1'</span> <span class="kw">AND</span> pi.situacao = <span class="str">'6'</span> <span class="kw">THEN</span>
+    <span class="fn">COALESCE</span>(qtde_adjudicada, quantidade_ofertada, quantidade_solicitada, <span class="num">1</span>)
+    * <span class="fn">COALESCE</span>(
+        valor_negociado_julgamento_calculado,   <span class="cm">-- 1º: pós-negociação</span>
+        valor_lance_calculado,                  <span class="cm">-- 2º: pós-disputa</span>
+        melhor_valor_proposta_lance_calculado,  <span class="cm">-- 3º: melhor valor</span>
+        valor_proposta_calculado                <span class="cm">-- 4º: proposta inicial (Concorrências fechadas)</span>
+    )
+<span class="kw">ELSE NULL END AS</span> valor_adjudicado_calculado</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div>
+          <div class="view-name">vw_itens_siasg_sc</div>
+          <div class="view-file">10_-_vw_itens_siasg_sc.sql</div>
+        </div>
+        <div class="view-badges"><span class="view-source">Siasg DW</span><span class="source-priority p2">2ª (Itens)</span></div>
+      </div>
+      <div class="view-body">
+        <p>Maior riqueza de dados: CATMAT/CATSER completo, dimensões do fornecedor (UF, município, porte, natureza jurídica), quantidade de lances e valores homologados.</p>
+        <div class="callout callout-warn">
+          <span class="callout-icon">⚠️</span>
+          <div><strong>JOIN de classificação via tabela fato</strong> (correção v2.0.7): usar <code>f_item.ID_ITCP_TP_COD_MAT_SERV</code>, não <code>d_item.ID_ITCP_MATERIAL_SERVICO</code> — a versão anterior produzia resultados incorretos.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div>
+          <div class="view-name">vw_itens_comprasnet_sc</div>
+          <div class="view-file">08_-_vw_itens_comprasnet_sc.sql</div>
+        </div>
+        <div class="view-badges"><span class="view-source">Comprasnet</span><span class="source-priority p4">4ª (Itens)</span></div>
+      </div>
+      <div class="view-body">
+        <p>UNION ALL das bases sigilosa e não-sigilosa. Campos ausentes preenchidos com <code>CAST(NULL AS tipo)</code> para compatibilidade no UNION ALL — <code>NULL</code> sem CAST causa erro de tipo.</p>
+      </div>
+    </div>
+
+    <div class="view-item highlight">
+      <div class="view-header">
+        <div>
+          <div class="view-name primary">vw_itens_consolidada_sc</div>
+          <div class="view-file">09_-_vw_itens_consolidada_sc.sql · <strong>View principal de itens</strong></div>
+        </div>
+        <div class="view-badges"><span class="view-source blue">CONSOLIDADA</span></div>
+      </div>
+      <div class="view-body">
+        <p>UNION ALL com anti-joins na hierarquia FaseExterna → Siasg DW → PNCP → Comprasnet. O anti-join é feito a nível de licitação — se ela existe no FaseExterna, todos os itens vêm do FaseExterna.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- STORED PROCEDURE -->
+  <div class="section">
+    <div class="section-eyebrow">Entrega ao Power BI</div>
+    <h2 class="section-title">Stored <em>Procedure</em></h2>
+
+    <div class="view-item" style="border-color:var(--amber-bdr);">
+      <div class="view-header" style="background:rgba(200,144,42,.06);">
+        <div>
+          <div class="view-name" style="color:var(--amber-lt);">sp_itens_licitacoes_pbi</div>
+          <div class="view-file">sp_itens_licitacoes_pbi.sql · Stored Procedure para Power BI</div>
+        </div>
+        <div class="view-badges"><span class="view-source amber">SP</span></div>
+      </div>
+      <div class="view-body">
+        <p>Resolve +1h → ~5–8 min via <code>#temp_censura</code> como barreira de otimização do SQL Server. Aplica censura de sigilo em 10 campos monetários quando <code>Situacao_Gerada = 'Não Homologada'</code> e <code>qtd_itens_sigilosos > 0</code>.</p>
+
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">SQL — Chamada no Power Query (modo Importação)</span></div>
+          <pre><code><span class="kw">EXEC</span> <span class="tb">temp_CGUSC.compras.sp_itens_licitacoes_pbi</span></code></pre>
+        </div>
+
+        <h3 class="sub-title">10 campos monetários censurados</h3>
+        <div class="field-list">
+          <span class="field-item">valor_estimado</span>
+          <span class="field-item">valor_estimado_calculado</span>
+          <span class="field-item">valor_unitario_homologado</span>
+          <span class="field-item">melhor_valor_proposta_lance_calculado</span>
+          <span class="field-item">melhor_valor_proposta_lance_informado</span>
+          <span class="field-item">melhor_valor_nao_desclassificado_calculado</span>
+          <span class="field-item">valor_proposta_calculado</span>
+          <span class="field-item">valor_lance_calculado</span>
+          <span class="field-item">valor_negociado_julgamento_calculado</span>
+          <span class="field-item">valor_adjudicado_calculado</span>
+        </div>
+
+        <div class="callout callout-info" style="margin-top:16px;">
+          <span class="callout-icon">ℹ️</span>
+          <div><strong>Não censurados:</strong> <code>qtd_lances_item</code> e <code>qtd_fornecedores_propostas</code> — não revelam o orçamento sigiloso.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<footer class="page-footer">
+  <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
+  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+</footer>
+</body></html>

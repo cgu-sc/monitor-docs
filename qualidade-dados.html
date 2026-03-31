@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qualidade de Dados — Monitor de Compras SC</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <span class="header-doc-label">Documentação Técnica</span>
+  <a class="header-brand" href="index.html">
+    <div class="brand-meta">
+      <span class="brand-label">CGU · SC</span>
+      <span class="brand-title">Monitor <em>de</em> Compras</span>
+    </div>
+  </a>
+  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+</header>
+
+<nav class="tab-nav">
+  <a class="tab-link" href="index.html"><span class="tab-icon">⌂</span> Início</a>
+  <a class="tab-link" href="regras-negocio.html"><span class="tab-icon">≡</span> Regras de Negócio</a>
+  <a class="tab-link" href="fontes-de-dados.html"><span class="tab-icon">⬢</span> Fontes de Dados</a>
+  <a class="tab-link" href="arquitetura.html"><span class="tab-icon">⬡</span> Arquitetura</a>
+  <a class="tab-link" href="camada-sql.html"><span class="tab-icon">&lt;/&gt;</span> Camada SQL</a>
+  <a class="tab-link active" href="qualidade-dados.html"><span class="tab-icon">⚠</span> Qualidade de Dados</a>
+  <a class="tab-link" href="glossario.html"><span class="tab-icon">§</span> Glossário</a>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="page-top">
+    <div class="page-eyebrow">Documentação / Qualidade de Dados</div>
+    <h1 class="page-title">Qualidade de <em>Dados</em></h1>
+    <p class="page-subtitle">Problemas identificados empiricamente, correções aplicadas e limitações aceitas</p>
+  </div>
+
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <p class="section-desc">Todos os problemas foram descobertos por investigação empírica — não por suposição. Cada item tem diagnóstico quantificado, impacto e decisão documentados.</p>
+    <div class="stat-row">
+      <div class="stat-card teal"><span class="stat-label">Correções aplicadas</span><span class="stat-value">7</span></div>
+      <div class="stat-card amber"><span class="stat-label">Limitações aceitas</span><span class="stat-value">4</span></div>
+      <div class="stat-card neutral"><span class="stat-label">Última correção</span><span class="stat-value" style="font-size:18px;margin-top:4px;">v2.0.9</span></div>
+    </div>
+  </div>
+
+  <!-- CORREÇÕES -->
+  <div class="section">
+    <div class="section-eyebrow">Correções Aplicadas</div>
+    <h2 class="section-title">Problemas <em>Corrigidos</em></h2>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-critical">🔴</div>
+        <div>
+          <div class="issue-title">item.homologado = 'S' como filtro de valor adjudicado</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.9</span>
+            <span class="issue-tag tag-fonte">FaseExterna</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>O campo era exigido como condição para calcular o valor adjudicado. A homologação é registrada a nível de <em>compra</em>, não de item — o campo a nível de item frequentemente não é atualizado.</p>
+        <div class="stat-pills">
+          <div class="stat-pill"><span class="sp-val">456.276</span><span class="sp-lbl">Licitações homologadas</span></div>
+          <div class="stat-pill"><span class="sp-val red">159.943</span><span class="sp-lbl">Com item.homologado='N' mas propostas adjudicadas</span></div>
+          <div class="stat-pill"><span class="sp-val red">35%</span><span class="sp-lbl">Percentual com valor adjudicado zerado (incorretamente)</span></div>
+        </div>
+        <div class="fix-banner">
+          <span>✅</span>
+          <div><strong>Correção:</strong> <code>item.homologado</code> removido das condições de cálculo. Condição suficiente e confiável: <code>proposta.situacao = '6'</code> (Adjudicada). O campo ainda é trazido na view como informação.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-critical">🔴</div>
+        <div>
+          <div class="issue-title">ROW_NUMBER sem desempate por id DESC — seleção aleatória de itens recriados</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.9</span>
+            <span class="issue-tag tag-fonte">FaseExterna</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>O FaseExterna pode recriar itens com novos IDs mantendo o mesmo <code>numero_item</code> e <code>versao = 0</code>. Sem desempate por ID, o banco escolhia um registro arbitrariamente.</p>
+        <p>Exemplo real: Pregão 90037/2025, UASG 155913 — item 1 tinha 3 IDs com versao=0. O registro mais recente tinha R$ 5.500 negociado; o mais antigo não tinha proposta adjudicada. Sem a correção, o valor aparecia como zero.</p>
+        <div class="fix-banner">
+          <span>✅</span>
+          <div><strong>Correção:</strong> <code>ORDER BY versao DESC, id DESC</code> — o ID maior sempre corresponde ao registro mais recente.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-critical">🔴</div>
+        <div>
+          <div class="issue-title">valor_estimado FaseExterna tratado como global para compras Normais</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.8</span>
+            <span class="issue-tag tag-fonte">FaseExterna</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>A lógica anterior (v2.0–v2.0.7) só multiplicava <code>valor_estimado × quantidade</code> para SRP. Para compras Normais, usava o valor diretamente como total. Verificação empírica em março/2026 confirmou: o campo é <strong>sempre unitário</strong> no FaseExterna, sem exceção.</p>
+        <div class="fix-banner">
+          <span>✅</span>
+          <div><strong>Correção:</strong> <code>COALESCE(quantidade_solicitada, 1) * COALESCE(valor_estimado, 0)</code> — aplicado sempre, independente do tipo de compra.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-warn">🟡</div>
+        <div>
+          <div class="issue-title">D_ITCP_MATERIAL_SERVICO sem chave única — duplicação de itens no JOIN</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.8</span>
+            <span class="issue-tag tag-fonte">Siasg DW</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>O mesmo código de material/serviço pode existir como Material (<code>'M'</code>) e como Serviço (<code>'S'</code>) na mesma tabela. JOIN sem desambiguação multiplicava os itens.</p>
+        <div class="fix-banner">
+          <span>✅</span>
+          <div><strong>Correção:</strong> JOIN desambiguado com <code>tipo_item_catalogo</code>. Para o FaseExterna, usa-se <code>TRY_CAST(codigo_item_catalogo AS INT)</code> para evitar falha em valores não-numéricos.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-warn">🟡</div>
+        <div>
+          <div class="issue-title">codGrupo com valores sentinela (0, -1, -2, -3) tratados como grupo válido</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.8</span>
+            <span class="issue-tag tag-fonte">Comprasnet</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>Valores sentinela do campo <code>codGrupo</code> eram exibidos no painel como números de grupo válidos.</p>
+        <div class="fix-banner">
+          <span>✅</span>
+          <div><strong>Correção:</strong> <code>CASE WHEN codGrupo &gt; 0 THEN codGrupo ELSE NULL END</code></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-warn">🟡</div>
+        <div>
+          <div class="issue-title">DT_PUBLICACAO_DOU com 88% de valores inválidos (1900-01-01) no Siasg</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.3</span>
+            <span class="issue-tag tag-fonte">Siasg DW</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <div class="stat-pills">
+          <div class="stat-pill"><span class="sp-val red">86%</span><span class="sp-lbl">Dispensas com data inválida</span></div>
+          <div class="stat-pill"><span class="sp-val red">90%</span><span class="sp-lbl">Inexigibilidades com data inválida</span></div>
+          <div class="stat-pill"><span class="sp-val teal">0%</span><span class="sp-lbl">DT_CMPR_RESULTADO_COMPRA inválidos</span></div>
+        </div>
+        <div class="fix-banner">
+          <span>✅</span>
+          <div><strong>Correção:</strong> Fallback para <code>DT_CMPR_RESULTADO_COMPRA</code> quando <code>DT_PUBLICACAO_DOU &lt;= '1901-01-01'</code>. Este campo está 100% preenchido para todas as modalidades.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-warn">🟡</div>
+        <div>
+          <div class="issue-title">Conflitos de tipo no UNION ALL entre fontes</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.8</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>Vários campos com tipos incompatíveis entre as views causavam erros no UNION ALL. Diagnosticados com <code>sp_describe_first_result_set</code> comparando tipos por nome de coluna.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Campo</th><th>Problema</th><th>Correção</th></tr></thead>
+            <tbody>
+              <tr><td>criterio_valor</td><td>SMALLINT (Comprasnet) vs VARCHAR com valor 'E' (FaseExterna)</td><td>CAST VARCHAR(50) nas 3 partes</td></tr>
+              <tr><td>id_fornecedor</td><td>CNPJ em VARCHAR vs tentativa de INT</td><td>CAST VARCHAR(20)</td></tr>
+              <tr><td>codigo_item_catalogo</td><td>INT vs VARCHAR entre fontes</td><td>CAST VARCHAR(50) + TRY_CAST no JOIN</td></tr>
+              <tr><td>ID_ITCP_PADRAO_DESC_MAT</td><td>Assumido INT, é VARCHAR(5)</td><td>CAST VARCHAR(10)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIMITAÇÕES -->
+  <div class="section">
+    <div class="section-eyebrow">Limitações Conhecidas</div>
+    <h2 class="section-title">Problemas <em>Aceitos</em></h2>
+    <p class="section-desc">Itens investigados onde a decisão foi aceitar como limitação das fontes — sem correção aplicável no SQL ou com ganho marginal.</p>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-info">🔵</div>
+        <div>
+          <div class="issue-title">Licitações FaseExterna sem itens carregados (~2%)</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-accept">Aceito como limitação</span>
+            <span class="issue-tag tag-fonte">FaseExterna</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <div class="stat-pills">
+          <div class="stat-pill"><span class="sp-val">520.080</span><span class="sp-lbl">Licitações totais (2022+)</span></div>
+          <div class="stat-pill"><span class="sp-val amber">10.206</span><span class="sp-lbl">Sem itens carregados</span></div>
+          <div class="stat-pill"><span class="sp-val amber">~2%</span><span class="sp-lbl">Percentual</span></div>
+        </div>
+        <p>O anti-join da consolidada de itens opera a nível de licitação — se ela existe no FaseExterna, os itens do Comprasnet são excluídos mesmo que o FaseExterna não tenha itens. Investigação mostrou que os itens do Comprasnet nesses casos também estão sem valores (<code>ipgValorRef = NULL</code>).</p>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-info">🔵</div>
+        <div>
+          <div class="issue-title">qtde_propostas_melhor_valor retorna -1 na maioria dos casos</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-accept">Campo não utilizado</span>
+            <span class="issue-tag tag-fonte">FaseExterna</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>Campo não confiável (diagnóstico fev/2026). Substituído por <code>COUNT(proposta_item)</code> para o número de fornecedores com proposta.</p>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-info">🔵</div>
+        <div>
+          <div class="issue-title">Campo numerocompra do PNCP despadronizado</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-accept">Sem impacto prático</span>
+            <span class="issue-tag tag-fonte">PNCP</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>Pode conter valores como <code>"060301/2024"</code>, <code>"DL 1"</code> e <code>"10 | Processo 212024"</code>. Sem impacto — o PNCP só é usado para registros inexistentes nas outras fontes, sem necessidade de JOIN por esse campo.</p>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-warn">🟡</div>
+        <div>
+          <div class="issue-title">Valores adjudicados do Comprasnet indisponíveis após abril/2024</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-watch">Monitorar</span>
+            <span class="issue-tag tag-fonte">Siasg DW</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>O Siasg DW é a única fonte de valores adjudicados para licitações do Comprasnet disponível na CGU. Como parou de ser atualizado em abril/2024, licitações do Comprasnet posteriores a essa data não têm valor adjudicado. Para licitações de 2024+, o FaseExterna é a fonte principal e tem os valores completos.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+<footer class="page-footer">
+  <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
+  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+</footer>
+</body></html>

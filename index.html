@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitor de Compras SC — Documentação</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── HEADER ─────────────────────────────────────────── -->
+<header class="site-header">
+  <!-- Esquerda: "Documentação Técnica" (some em telas pequenas) -->
+  <span class="header-doc-label">Documentação Técnica</span>
+
+  <!-- Centro: CGU·SC + Monitor de Compras, alinhados à esquerda entre si -->
+  <a class="header-brand" href="index.html">
+    <div class="brand-meta">
+      <span class="brand-label">CGU · SC</span>
+      <span class="brand-title">Monitor <em>de</em> Compras</span>
+    </div>
+  </a>
+
+  <!-- Direita: versão -->
+  <div class="header-right">
+    <span class="version-pill">v2.0.9 — Mar/2026</span>
+  </div>
+</header>
+
+<!-- ── TABS ───────────────────────────────────────────── -->
+<nav class="tab-nav">
+  <a class="tab-link active" href="index.html"><span class="tab-icon">⌂</span> Início</a>
+  <a class="tab-link" href="regras-negocio.html"><span class="tab-icon">≡</span> Regras de Negócio</a>
+  <a class="tab-link" href="fontes-de-dados.html"><span class="tab-icon">⬢</span> Fontes de Dados</a>
+  <a class="tab-link" href="arquitetura.html"><span class="tab-icon">⬡</span> Arquitetura</a>
+  <a class="tab-link" href="camada-sql.html"><span class="tab-icon">&lt;/&gt;</span> Camada SQL</a>
+  <a class="tab-link" href="qualidade-dados.html"><span class="tab-icon">⚠</span> Qualidade de Dados</a>
+  <a class="tab-link" href="glossario.html"><span class="tab-icon">§</span> Glossário</a>
+</nav>
+
+<!-- ── CONTEÚDO ───────────────────────────────────────── -->
+<div class="page-wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">CGU / Regional Santa Catarina — Painel de BI</div>
+    <div class="hero-title">Monitor de <span>Compras SC</span></div>
+    <p class="hero-desc">
+      Painel de Business Intelligence que consolida informações sobre compras públicas das
+      UASGs de Santa Catarina jurisdicionadas à CGU, integrando quatro sistemas federais
+      com hierarquia de prioridade e controle de sigilo aplicado na camada SQL.
+    </p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <span class="lbl">Versão</span>
+        <span class="val">2.0.9 — Março/2026</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="lbl">Responsável Técnica</span>
+        <span class="val">Tatiana Popia Corrêa — NEP/CGU-SC</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="lbl">Escopo Temporal</span>
+        <span class="val">2022 — presente</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISÃO GERAL -->
+  <div class="section">
+    <div class="section-eyebrow">Visão Geral</div>
+    <h2 class="section-title">O que é o Monitor de <em>Compras</em>?</h2>
+    <p class="section-desc">
+      O Monitor de Compras é um <strong>painel de Business Intelligence (Power BI)</strong>
+      que consolida informações sobre compras públicas das UASGs de Santa Catarina
+      jurisdicionadas à CGU. Fornece insumos para monitoramento contínuo, identificação
+      de riscos e priorização de ações de controle. A censura de valores sigilosos é
+      aplicada integralmente na camada SQL, antes de qualquer dado chegar ao Power BI.
+    </p>
+
+    <!-- 4 feature cards — cada um com cor diferente -->
+    <div class="feat-grid">
+      <div class="feat-card feat-blue">
+        <span class="feat-icon">🏛️</span>
+        <div class="feat-title">Finalidade Institucional</div>
+        <p class="feat-text">
+          Monitoramento das compras públicas das UASGs catarinenses sob jurisdição
+          da CGU, com foco em análise de riscos e controle preventivo contínuo.
+        </p>
+      </div>
+      <div class="feat-card feat-teal">
+        <span class="feat-icon">🔗</span>
+        <div class="feat-title">Consolidação Multi-Fonte</div>
+        <p class="feat-text">
+          Integra FaseExterna, Comprasnet, Siasg DW e PNCP com hierarquia de
+          prioridade e deduplicação via anti-joins SQL.
+        </p>
+      </div>
+      <div class="feat-card feat-amber">
+        <span class="feat-icon">🔒</span>
+        <div class="feat-title">Controle de Sigilo</div>
+        <p class="feat-text">
+          Valores sigilosos são zerados ou exibidos em faixas pela camada SQL.
+          O Power BI nunca recebe orçamentos sigilosos brutos.
+        </p>
+      </div>
+      <div class="feat-card feat-sage">
+        <span class="feat-icon">📐</span>
+        <div class="feat-title">Arquitetura em Camadas</div>
+        <p class="feat-text">
+          Views por fonte → views consolidadas → stored procedure → Power BI.
+          Cada camada encapsula regras específicas de qualidade e negócio.
+        </p>
+      </div>
+    </div>
+
+    <!-- 4 stat cards -->
+    <div class="stat-row">
+      <div class="stat-card blue">
+        <span class="stat-label">Período coberto</span>
+        <span class="stat-value">2022+</span>
+      </div>
+      <div class="stat-card teal">
+        <span class="stat-label">Fontes integradas</span>
+        <span class="stat-value">4</span>
+      </div>
+      <div class="stat-card amber">
+        <span class="stat-label">Views SQL</span>
+        <span class="stat-value">11</span>
+      </div>
+      <div class="stat-card neutral">
+        <span class="stat-label">Stored Procedures</span>
+        <span class="stat-value">1</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div class="section">
+    <div class="section-eyebrow">Histórico</div>
+    <h2 class="section-title">Evolução do <em>Projeto</em></h2>
+
+    <h3 class="sub-title">Série v2.0.x — Refatoração Completa (Jan–Mar/2026)</h3>
+    <div class="timeline">
+      <div class="tl-item major">
+        <div class="tl-date">Janeiro/2026<span class="tl-version">v2.0</span></div>
+        <div class="tl-title">Refatoração completa das views SQL</div>
+        <div class="tl-desc">Reescrita da arquitetura com modularização por fonte de dados.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Janeiro/2026<span class="tl-version">v2.0.1 – v2.0.2</span></div>
+        <div class="tl-title">Campos de datas e correção de duplicatas</div>
+        <div class="tl-desc">Adição de <code>data_primeira_publicacao</code> e <code>data_ultima_publicacao</code>. Correção de duplicatas no Comprasnet e Siasg.</div>
+      </div>
+      <div class="tl-item major">
+        <div class="tl-date">Janeiro/2026<span class="tl-version">v2.0.3</span></div>
+        <div class="tl-title">Siasg DW como 3ª fonte</div>
+        <div class="tl-desc">Criação de <code>vw_licitacoes_siasg_sc</code>. UNION consolidado passa a 3 fontes.</div>
+      </div>
+      <div class="tl-item major">
+        <div class="tl-date">Fevereiro/2026<span class="tl-version">v2.0.4</span></div>
+        <div class="tl-title">PNCP como 4ª fonte</div>
+        <div class="tl-desc">Criação de <code>vw_disp_inex_pncp_sc</code> para Dispensas e Inexigibilidades.</div>
+      </div>
+      <div class="tl-item major">
+        <div class="tl-date">Fevereiro/2026<span class="tl-version">v2.0.5</span></div>
+        <div class="tl-title">Stored Procedure — timeout de +1h resolvido</div>
+        <div class="tl-desc">Criação de <code>vw_itens_siasg_sc</code> e <code>sp_itens_licitacoes_pbi</code>. Tabela <code>#temp_censura</code> como barreira de otimização reduz para ~5–8 min.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Fev–Mar/2026<span class="tl-version">v2.0.6 – v2.0.7</span></div>
+        <div class="tl-title">Reorganização e correções de JOINs</div>
+        <div class="tl-desc">Centralização das regras de itens. Correção dos JOINs de fornecedor e classificação na <code>vw_itens_siasg_sc</code>.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Março/2026<span class="tl-version">v2.0.8</span></div>
+        <div class="tl-title">Correções críticas de qualidade de dados</div>
+        <div class="tl-desc"><code>valor_estimado</code> do FaseExterna sempre unitário (corrigido). Sentinelas <code>codGrupo</code> tratados como NULL. Conflitos de tipo no UNION ALL resolvidos.</div>
+      </div>
+      <div class="tl-item major">
+        <div class="tl-date">Março/2026<span class="tl-version">v2.0.9</span></div>
+        <div class="tl-title">item.homologado removido · ROW_NUMBER corrigido</div>
+        <div class="tl-desc">35% de falsos negativos eliminados (159.943 licitações). <code>ORDER BY versao DESC, id DESC</code> corrige seleção aleatória. 4º fallback de valor adjudicado adicionado.</div>
+      </div>
+    </div>
+
+    <h3 class="sub-title">Série v1.x — Primeira Geração (Abr/2024 – 2025)</h3>
+    <div class="timeline">
+      <div class="tl-item major">
+        <div class="tl-date">Abril/2024<span class="tl-version">v1.0</span></div>
+        <div class="tl-title">Criação inicial do painel</div>
+        <div class="tl-desc">Primeira versão com visão geral e valores sigilosos. Tabela <code>LicitacoesSC</code> no Power BI.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">2024<span class="tl-version">v1.0.1</span></div>
+        <div class="tl-title">Expansão com itens e dispensas/inexigibilidades</div>
+        <div class="tl-desc">Novas tabelas PBI: <code>ItensLicitacao</code>, <code>DispInex</code> e <code>ItensDispInex</code>.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">2024<span class="tl-version">v1.1 – v1.1.1</span></div>
+        <div class="tl-title">"Painel de Licitações" · Migração para temp_CGUSC</div>
+        <div class="tl-desc">Separação homologação/produção. Abas Gráfico Temporal e Gráfico Unidades. Tabelas <code>Calendario</code> e <code>UASGs</code>.</div>
+      </div>
+      <div class="tl-item major">
+        <div class="tl-date">Outubro/2024<span class="tl-version">v1.2</span></div>
+        <div class="tl-title">Renomeado para "Monitor de Compras"</div>
+        <div class="tl-desc">Aba de Indicadores, aprimoramento de filtros, medidas dos gráficos temporais V e Q.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">2024–2025<span class="tl-version">v1.2.1</span></div>
+        <div class="tl-title">Fornecedores, alertas Alice e refinamentos</div>
+        <div class="tl-desc">Dados dos fornecedores nos itens. Subpainel Alice. Separação da Visão Geral em Homologadas/Não Homologadas.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">2025<span class="tl-version">v1.3 – v1.3.2</span></div>
+        <div class="tl-title">Capa, nuvem e expansão para 2025</div>
+        <div class="tl-desc">Capa visual, transferência para nuvem, cobertura de 4 anos (2022–2025), apresentação à CGPLA.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">2025<span class="tl-version">v1.3.3</span></div>
+        <div class="tl-title">Trilhas de alertas e integração ComprasGov</div>
+        <div class="tl-desc">Valores estimados e adjudicados do FaseExterna. Criação de <code>vw_adjudicado_comprasgov_SC</code> e <code>vw_valor_estimado_comprasgov_SC</code> — precursoras da v2.0.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVEGAÇÃO -->
+  <div class="section">
+    <div class="section-eyebrow">Navegar</div>
+    <h2 class="section-title">Seções desta <em>Documentação</em></h2>
+
+    <div class="nav-cards">
+      <a class="nav-card" href="regras-negocio.html">
+        <span class="nc-icon">📋</span>
+        <div class="nc-title">Regras de Negócio</div>
+        <p class="nc-desc">Cálculos de valores, situações, sigilo, modalidades e mapeamentos.</p>
+        <div class="nc-arrow">→ Ver regras</div>
+      </a>
+      <a class="nav-card" href="fontes-de-dados.html">
+        <span class="nc-icon">🗄️</span>
+        <div class="nc-title">Fontes de Dados</div>
+        <p class="nc-desc">FaseExterna, Comprasnet, Siasg DW e PNCP — características e limitações.</p>
+        <div class="nc-arrow">→ Ver fontes</div>
+      </a>
+      <a class="nav-card" href="arquitetura.html">
+        <span class="nc-icon">🏗️</span>
+        <div class="nc-title">Arquitetura Geral</div>
+        <p class="nc-desc">Diagrama das 5 camadas, fluxo de dados, anti-joins e solução de performance.</p>
+        <div class="nc-arrow">→ Ver arquitetura</div>
+      </a>
+      <a class="nav-card" href="camada-sql.html">
+        <span class="nc-icon">🧩</span>
+        <div class="nc-title">Camada SQL</div>
+        <p class="nc-desc">Views e stored procedure documentadas com trechos de código.</p>
+        <div class="nc-arrow">→ Ver views</div>
+      </a>
+      <a class="nav-card" href="qualidade-dados.html">
+        <span class="nc-icon">⚠️</span>
+        <div class="nc-title">Qualidade de Dados</div>
+        <p class="nc-desc">7 correções críticas e 4 limitações aceitas, com métricas empíricas.</p>
+        <div class="nc-arrow">→ Ver issues</div>
+      </a>
+      <a class="nav-card" href="glossario.html">
+        <span class="nc-icon">📖</span>
+        <div class="nc-title">Glossário</div>
+        <p class="nc-desc">Termos de compras públicas, siglas e conceitos técnicos do projeto.</p>
+        <div class="nc-arrow">→ Ver glossário</div>
+      </a>
+    </div>
+  </div>
+
+</div><!-- /page-wrap -->
+
+<footer class="page-footer">
+  <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
+  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+</footer>
+
+</body>
+</html>
