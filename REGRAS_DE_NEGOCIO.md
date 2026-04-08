@@ -1,8 +1,8 @@
 # Regras de Negócio - Monitor de Compras SC
 
 ## Documento de Especificação Técnica
-**Versão:** 2.0.9  
-**Data:** Março/2026  
+**Versão:** 2.10  
+**Data:** Abril/2026  
 **Projeto:** Monitor de Compras - CGU/SC
 
 ---
@@ -65,8 +65,9 @@ Ordem: **FaseExterna → Siasg DW → PNCP → Comprasnet**
 | `db_compras.ComprasGov_FaseExterna` | Restrita | Nova estrutura do ComprasGov |
 | `db_dwsiasg` | Restrita | Data Warehouse do Siasg (parou em abril/2024) |
 | `db_pncp` | Restrita | Portal Nacional de Contratações Públicas |
+| `db_cnpj` | Restrita | Base da Receita Federal: `CNPJ` (dados cadastrais), `NaturezaJuridica`, `TipoNaturezaJuridica` — usada para enriquecer dados do fornecedor (§17.3.4) |
 | `db_portal` | Restrita | Portal da Transparência |
-| `temp_CGUSC` | Trabalho | Views de apoio do projeto |
+| `temp_CGUSC` | Trabalho | Views e tabelas de apoio do projeto (`compras.*`, `dbo.vw_jurisdicionadas_sc`, `dbo.porteEmpresa`) |
 
 ---
 
@@ -1116,6 +1117,12 @@ Campo `tb_compras_evento.evento` (int):
 
 O PNCP é a **quarta fonte de dados** do sistema, utilizada exclusivamente para capturar **Dispensas e Inexigibilidades** que não existem nas outras bases. É a única fonte atualizada para essas modalidades.
 
+> **Base legal (v2.10):** O PNCP foi criado pelo Art. 174 da **Lei nº 14.133/2021** (Nova Lei de Licitações) como sítio eletrônico oficial para divulgação centralizada e obrigatória dos atos de contratação pública. O portal é **exclusivo da nova lei** — licitações baseadas na Lei 8.666/93 ou na Lei do Pregão (10.520/02) **não foram e não serão migradas** para o PNCP.
+>
+> **Identificação de contratações:** Sob a Lei 14.133/2021, o PNCP adota um conceito unificado de "Compra" (contratação) com **numeração sequencial única por CNPJ do órgão e ano**, independente da modalidade. Isso difere do modelo anterior (Comprasnet/Siasg) onde o `numero_compra` era por UASG + modalidade.
+>
+> **Implicação:** Não há risco de colisão de `numero_compra` entre modalidades diferentes no PNCP — cada número é único para o par CNPJ+ano.
+
 ### 16.2 Mapeamento de Modalidades
 
 | Código PNCP | Nome PNCP | Código Normalizado | Nome Normalizado |
@@ -1201,6 +1208,44 @@ WHERE situacaocompraitemresultadoid <> 2
 - IDs de exemplo para consulta futura: `5843124`, `5843646`, `5848011`, `5870659`
 - **Impacto:** O campo `numprp` pode ser NULL quando `numerocompra` não é numérico.
 - **Mitigação:** Como usamos PNCP apenas para Dispensas e Inexigibilidades (que não existem nas outras bases), não há necessidade de JOIN por esse campo.
+
+### 16.7 Link para o PNCP (v2.10)
+
+A `Consulta_LicitacoesSC_PBI.sql` gera um link direto para a contratação no PNCP quando ela existe no portal.
+
+**Formato da URL:**
+```
+https://pncp.gov.br/app/editais/{CNPJ_ORGAO}/{ANO}/{SEQUENCIAL_COMPRA}
+```
+
+**Exemplo:**
+- Contratação 283/2025 da UFSC (UASG 153163)
+- CNPJ do órgão: `83899526000182` (obtido via `unidadeorgao` → `orgao`)
+- `sequencialcompra`: `282` (diferente de `numerocompra` = 283!)
+- URL: `https://pncp.gov.br/app/editais/83899526000182/2025/282`
+
+**Implementação:**
+```sql
+LEFT JOIN (
+    SELECT DISTINCT uo.codigounidade, o.cnpj, c.numerocompra, c.anocompra, c.sequencialcompra
+    FROM db_pncp.dbo.compra c
+    JOIN db_pncp.dbo.unidadeorgao uo ON c.unidadeorgaoid = uo.id
+    JOIN db_pncp.dbo.orgao o ON uo.orgaoid = o.id
+) AS pncp_link
+    ON CAST(d.UASG AS VARCHAR) = pncp_link.codigounidade
+    AND CAST(d.numero_compra AS VARCHAR) = pncp_link.numerocompra
+    AND d.ano_compra = pncp_link.anocompra
+```
+
+**⚠️ Atenção:** A URL usa `sequencialcompra`, **NÃO** `numerocompra`. São campos diferentes no PNCP:
+- `numerocompra`: número atribuído pelo órgão à contratação (ex: 283)
+- `sequencialcompra`: número sequencial interno do PNCP (ex: 282)
+
+**Comportamento:**
+- Licitação existe no PNCP → link gerado com `sequencialcompra` correto
+- Licitação não existe no PNCP → link = NULL (não há como montar sem o sequencial)
+
+> **Nota:** Diferente do link ComprasGov (gerado para todas as licitações concatenando Cod_licitacao), o link PNCP só é gerado quando a licitação existe de fato no portal.
 
 ---
 
@@ -1353,6 +1398,65 @@ DATEDIFF(day, cens.data_primeira_publicacao, cens.data_abertura)
 - Usa a `data_primeira_publicacao` já consolidada (com hierarquia Alice → fallback por fonte)
 - Evita trazer campos de data duplicados na view de itens
 
+#### 17.2.6 Normalização de Critério de Julgamento e Critério de Valor (v2.10)
+
+Os campos `criterio_julgamento_item` e `criterio_valor` vêm como **códigos** no FaseExterna e Comprasnet, mas como **descrição** no Siasg DW. A `sp_itens_licitacoes_pbi` normaliza ambos via CASE no SELECT final.
+
+**Critério de Julgamento do Item:**
+
+| Código | Descrição | Fontes |
+|--------|-----------|--------|
+| 1 | Menor Preço | FaseExterna, Comprasnet |
+| 2 | Maior Desconto | FaseExterna, Comprasnet |
+| 3 | Melhor Técnica | FaseExterna, Comprasnet |
+| 4 | Técnica e Preço | FaseExterna, Comprasnet |
+| 5 | Conteúdo Artístico | FaseExterna, Comprasnet |
+| 6 | Maior Retorno Econômico | FaseExterna, Comprasnet |
+| 7 | Menor Preço / Maior Desconto | Comprasnet |
+| 8 | Melhor Técnica / Conteúdo Artístico | FaseExterna |
+| (texto) | Passa direto | Siasg DW (já vem como descrição) |
+
+**Critério de Valor do Item:**
+
+| Código FaseExterna (letra) | Código FaseExterna/Comprasnet (número) | Descrição |
+|---|---|---|
+| E | 2 | Valor Estimado |
+| M | 1 | Valor Máximo Aceitável |
+| R | 3 | Valor de Referência |
+| P | 4 | Prêmio / Remuneração |
+| A | — | Valor Gasto Atualmente |
+| C | — | Critério de Valor |
+| — | 0 | Sem Domínio |
+| (texto) | — | Siasg DW (já vem como descrição) |
+
+> **Nota:** O FaseExterna possui **duas codificações** para `criterio_valor` — letras (CriterioValorItemEnum) e números (CriterioValorItemSiasgnetEnum). Ambas são mapeadas na SP.
+
+#### 17.2.7 Campos Removidos da SP (v2.10)
+
+| Campo removido | Motivo |
+|----------------|--------|
+| `ID Tipo Mat/Serv` (`ID_ITCP_TP_MATERIAL_SERVICO`) | Redundante — `Tipo Mat/Serv` já traz "Material"/"Serviço" de forma confiável |
+| `Tipo Mat/Serv Descrição` (`DS_ITCP_TP_MATERIAL_SERVICO`) | Redundante e frequentemente em branco (depende do JOIN com DW) |
+| `ID Valor Sigiloso` e `Valor Sigiloso` | Redundantes com `Orçamento Sigiloso` (mesmo dado, fontes diferentes) |
+
+#### 17.2.8 Cabeçalhos de Grupo — Exclusão de Itens Negativos (v2.9)
+
+No FaseExterna, itens com `numero_item` negativo são **cabeçalhos de grupo** (totalizadores). Eles contêm o valor estimado total do grupo (soma dos subitens) e causam **dupla contagem** se incluídos nas agregações.
+
+**Exemplo:** Pregão 90014/2025, UASG 158517
+| numero_item | numero_grupo | valor_estimado | qtd | Tipo |
+|---|---|---|---|---|
+| -8 | NULL | 765.100,00 | NULL | Cabeçalho do Grupo 8 |
+| 1 | -8 | 6,55 | 100.000 | Subitem do Grupo 8 |
+| 2 | -8 | 22,02 | 5.000 | Subitem do Grupo 8 |
+
+**Tratamento na SP:**
+- `WHERE i.numero_item > 0 OR i.numero_item IS NULL` — exclui cabeçalhos
+- `ABS(i.numero_grupo) AS 'Nº Grupo'` — normaliza negativos para positivos
+
+**Tratamento na `vw_licitacoes_faseexterna_sc`:**
+- `AND (i.numero_item > 0 OR i.numero_item IS NULL)` no JOIN da `valores_agregados` — evita dupla contagem nos totais
+
 ### 17.3 Fornecedor Vencedor e Valores Adjudicados por Fonte
 
 #### 17.3.1 FaseExterna
@@ -1416,6 +1520,61 @@ LEFT JOIN [db_dwsiasg].[dbo].[D_LCAL_REGIAO] AS regiao_fornecedor ...
 #### 17.3.3 Comprasnet
 
 A versão do Comprasnet disponível na CGU (`db_compras`) **não possui** a tabela `TBL_PROPOSTAITEM`, que conteria os dados de propostas aceitas, habilitadas e adjudicadas. Por isso, **não é possível obter fornecedor vencedor nem valores adjudicados** a partir do Comprasnet. Ver §5.3 para detalhes.
+
+#### 17.3.4 Enriquecimento de Dados do Fornecedor via `db_cnpj` (v2.9, atualizado v2.10)
+
+O **Siasg DW** é a única fonte que traz dados completos do fornecedor vencedor (tipo pessoa, natureza jurídica, porte, UF, município, região) via suas dimensões. O **FaseExterna** e **Comprasnet** só trazem CNPJ e nome.
+
+Para complementar, a `sp_itens_licitacoes_pbi` materializa os dados de CNPJ numa tabela temporária (Passo 2) com JOINs nas tabelas de referência:
+
+```sql
+-- Passo 2: Temp table com dados do fornecedor enriquecidos
+SELECT c.Cnpj, c.RazaoSocial, c.UF, c.Municipio, c.CodMunicipio,
+       nj.DescNaturezaJuridica,          -- via JOIN com NaturezaJuridica
+       tnj.DescTipoNaturezaJuridica,     -- via JOIN com TipoNaturezaJuridica
+       CASE CodPorteEmpresa ... END AS PorteEmpresa  -- mapeado direto (3 valores)
+INTO #temp_cnpj
+FROM db_cnpj.dbo.CNPJ AS c
+LEFT JOIN db_cnpj.dbo.NaturezaJuridica AS nj
+    ON TRY_CAST(c.CodNaturezaJuridica AS INT) = nj.IdNaturezaJuridica
+LEFT JOIN db_cnpj.dbo.TipoNaturezaJuridica AS tnj
+    ON nj.IdTipoNaturezaJuridica = tnj.IdTipoNaturezaJuridica
+```
+
+**Tabelas de referência usadas:**
+
+| Tabela | Campos | Exemplo |
+|--------|--------|---------|
+| `db_cnpj.dbo.NaturezaJuridica` | `IdNaturezaJuridica`, `DescNaturezaJuridica`, `IdTipoNaturezaJuridica` | 2062 → "Sociedade Empresária Limitada" |
+| `db_cnpj.dbo.TipoNaturezaJuridica` | `IdTipoNaturezaJuridica`, `DescTipoNaturezaJuridica` | 2 → "ENTIDADES EMPRESARIAIS" |
+| `temp_CGUSC.dbo.porteEmpresa` | `codPorteEmpresa`, `descricao` | 01 → "Microempresa (ME)" |
+
+**Mapeamento de Porte (CASE na SP, sem JOIN):**
+
+| Código (`CodPorteEmpresa`) | Descrição |
+|----------------------------|-----------|
+| `01` / `1` | Microempresa (ME) |
+| `03` / `3` | Empresa de Pequeno Porte (EPP) |
+| `05` / `5` | Demais empresas (Médio e Grande Porte) |
+
+**Campos enriquecidos no Passo 3 (COALESCE: Siasg → db_cnpj):**
+
+| Campo no Power BI | Siasg DW (preferencial) | db_cnpj (fallback) |
+|-------------------|------------------------|---------------------|
+| Fornecedor (nome) | `NO_FRND_FORNECEDOR` | `RazaoSocial` |
+| Tipo Pessoa | `DS_FRND_TP_PESSOA_FORNEC` | Inferido do tamanho do CNPJ (14=PJ, 11=PF) |
+| Natureza Jur. | `DS_FRND_NATUREZA_JURIDICA` | `DescNaturezaJuridica` (descrição completa) |
+| Tipo Natureza Jur. | — | `DescTipoNaturezaJuridica` (tipo macro) |
+| Porte | `DS_FRND_PORTE_EMPRESA` | Mapeado via CASE (ME/EPP/Demais) |
+| UF | `DS_LCAL_UF` | `UF` |
+| Município | `DS_LCAL_MUNICIPIO` | `Municipio` |
+| ID Município | `ID_LCAL_MUNICIPIO` | `CodMunicipio` |
+
+> **Nota:** O db_cnpj só contém CNPJs (pessoa jurídica). Fornecedores pessoa física (CPF) não terão match e permanecerão sem dados complementares.
+>
+> **Nota 2:** Os dados do Siasg DW são de abril/2024 (parada do DW), enquanto o db_cnpj pode estar mais atualizado. Para fontes que não sejam Siasg, os dados do db_cnpj refletem a situação cadastral mais recente do fornecedor.
+>
+> **Performance (v2.10):** O enriquecimento é feito via tabela temporária (#temp_cnpj) em 3 etapas: (1) coleta CNPJs distintos, (2) busca dados com JOINs nas tabelas de referência, (3) JOIN no SELECT final. Evita JOIN direto com `db_cnpj.dbo.CNPJ` (tabela grande) no SELECT principal.
 
 ### 17.4 Classificação de Material/Serviço — Hierarquia por Fonte
 
@@ -1624,84 +1783,75 @@ EXEC temp_CGUSC.compras.sp_itens_licitacoes_pbi
 
 ## 19. Histórico de Alterações
 
-### 19.1 Versão 1.x — Primeira Geração (Abr/2024 – Dez/2025)
-
-> **Nota:** A série 1.x utilizava arquitetura de views distinta da v2.0. As views `vw_adjudicado_comprasgov_SC` e `vw_valor_estimado_comprasgov_SC` criadas na v1.3.3 foram as precursoras diretas da integração completa do FaseExterna realizada na v2.0.
-
 | Data | Versão | Alteração |
 |------|--------|-----------|
-| Abril/2024 | **1.0** | **Criação inicial do painel** com visão geral e valores de orçamentos sigilosos das UASGs jurisdicionadas. Tabela `LicitacoesSC` no Power BI. |
-| 2024 | 1.0.1 | Expansão para incluir visões de itens de licitações. Inclusão de visão geral, listagem e itens de dispensas e inexigibilidades. Novas tabelas no PBI: `ItensLicitacao`, `DispInex` e `ItensDispInex`. |
-| 2024 | **1.1** | **Renomeado para "Painel de Licitações"**. Separação em versões de homologação e produção. Recriação estrutural das views. Inclusão do campo de data de publicação, tipo de administração da unidade e nome da modalidade. Novas situações Revogada e Anulada em `situacao_gerada`. |
-| 2024 | 1.1.1 | Migração das views para `temp_CGUSC`, garantindo mais perenidade ao projeto. Separação dos painéis PBI em produção/homologação. Separação do painel de detalhamento em homologadas/não homologadas. Criação das abas Gráfico Temporal (quantidades e valores) e Gráfico Unidades. Novas tabelas PBI: `Calendario` e `UASGs`. |
-| Outubro/2024 | **1.2** | **Renomeado para "Monitor de Compras"** (nome definitivo). Aprimoramento dos filtros (exibir "todos selecionados"). Inclusão da aba de Indicadores. Medidas das linhas dos gráficos temporais V e Q. Criação da pasta de Relatórios de Atividades. |
-| 2024–2025 | 1.2.1 | Dados dos fornecedores nos itens. Campo "Situação Pregão". Subpainel de Alertas Alice nos Indicadores; tabela Alertas no PBI. Grupo do item e número de fornecedores com lance. Cruzamento com `db_portal` na view de jurisdicionadas para obter UG correta. Separação da Visão Geral em Homologadas/Não Homologadas. |
-| 2025 | **1.3** | Capa de apresentação para os painéis. Transferência para a nuvem. Menu com submenu e imagens geradas por IA. Correção dos bugs de filtro do gráfico temporal. |
-| 2025 | 1.3.1 | Adaptação para cobrir 4 anos (2022–2025). Simplificação das medidas na aba Indicadores. Número de alertas na visualização detalhada. |
-| 2025 | 1.3.2 | Correções de bugs e ajustes de exibição para apresentação à CGPLA. |
-| 2025 | 1.3.3 | Detalhes das trilhas dos alertas nos Indicadores. Atualização das views 08 e 09 (Alice). Inclusão dos valores estimados do FaseExterna (ComprasGov) e valores adjudicados na consulta `LicitacoesSC`. Criação de `vw_adjudicado_comprasgov_SC` e `vw_valor_estimado_comprasgov_SC` — precursoras da integração completa da v2.0. |
-
----
-
-### 19.2 Versão 2.x — Refatoração Completa (Jan–Mar/2026)
-
-| Data | Versão | Alteração |
-|------|--------|-----------|
-| Janeiro/2026 | **2.0** | **Refatoração completa das views SQL** — reescrita da arquitetura com modularização por fonte de dados |
-| Janeiro/2026 | 2.0.1 | Adição de campos `data_primeira_publicacao` e `data_publicacao_fonte` |
-| Janeiro/2026 | 2.0.1 | Correção de tipos NULL na view de itens Comprasnet para compatibilidade UNION |
-| Janeiro/2026 | 2.0.2 | Adição de campo `data_ultima_publicacao` |
-| Janeiro/2026 | 2.0.2 | Correção de duplicatas: ROW_NUMBER na tb_compras ordenando por dataAlteracao |
-| Janeiro/2026 | 2.0.2 | Correção de duplicatas: GROUP BY na vw_siasg_situacao_sc |
-| Janeiro/2026 | **2.0.3** | **Integração do Siasg como terceira fonte de dados** |
-| Janeiro/2026 | 2.0.3 | Criação da view `vw_licitacoes_siasg_sc` |
-| Janeiro/2026 | 2.0.3 | Atualização da `vw_licitacoes_consolidada_sc` para UNION de 3 fontes |
-| Janeiro/2026 | 2.0.3 | Remoção de campos da jurisdicionadas das views (relacionamento feito no Power BI) |
-| Janeiro/2026 | 2.0.3 | Expansão do mapeamento de situações do Siasg |
-| Janeiro/2026 | 2.0.3 | Documentação: considerações técnicas para consultas ao Siasg |
-| Fevereiro/2026 | **2.0.4** | **Integração do PNCP como quarta fonte de dados** |
-| Fevereiro/2026 | 2.0.4 | Criação da view `vw_disp_inex_pncp_sc` para Dispensas e Inexigibilidades |
-| Fevereiro/2026 | 2.0.4 | Atualização da `vw_licitacoes_consolidada_sc` para UNION de 4 fontes |
-| Fevereiro/2026 | 2.0.4 | Documentação: mapeamento completo do PNCP (modalidades, situações, valores) |
-| Fevereiro/2026 | **2.0.5** | **Nova hierarquia de prioridade para ITENS** (diferente de licitações) |
-| Fevereiro/2026 | 2.0.5 | Criação da view `vw_itens_siasg_sc` — itens do Siasg DW com fornecedor e classificação completa |
-| Fevereiro/2026 | 2.0.5 | Criação da `sp_itens_licitacoes_pbi` — Stored Procedure para Power BI com censura (resolve timeout >1h) |
-| Fevereiro/2026 | 2.0.5 | Documentação: hierarquia de classificação material/serviço (codconjmat ↔ ID_ITCP_MATERIAL_SERVICO) |
-| Fevereiro/2026 | 2.0.5 | Documentação: correspondência de códigos Comprasnet ↔ Siasg DW (mesma origem SIASG mainframe) |
-| Fevereiro/2026 | 2.0.5 | Documentação: problema de performance e solução com tabela temporária como barreira de otimização |
-| Fevereiro/2026 | 2.0.5 | Documentação: regras de censura de sigilo a nível de item (10 campos zerados) |
-| Fevereiro/2026 | **2.0.6** | **Reorganização: criação do §19 — Regras de Negócio de Itens** (centraliza todas as regras de itens) |
-| Fevereiro/2026 | 2.0.6 | Movidos para §19: hierarquia de prioridade de itens (ex-§2.1.1), classificação material/serviço (ex-§15A), performance (ex-§15B), fornecedor vencedor (ex-§5.4) |
-| Fevereiro/2026 | 2.0.6 | Novo §19.2: campos `qtd_lances_item` e `qtd_fornecedores_propostas` — decisões técnicas e disponibilidade por fonte |
-| Fevereiro/2026 | 2.0.6 | Documentação: `QT_ITCP_LANCES_ITEM` (Siasg DW) não tem equivalente no FaseExterna |
-| Fevereiro/2026 | 2.0.6 | Documentação: `qtde_propostas_melhor_valor` do FaseExterna retorna -1 na maioria dos casos (campo não confiável) |
-| Fevereiro/2026 | **2.0.7** | **Correção `vw_itens_siasg_sc` v2.0** — JOINs corrigidos conforme consulta original `vw_valor_homologado_siasg_sc` |
-| Fevereiro/2026 | 2.0.7 | Correção: tabela fornecedor `D_FRND_FORNECEDOR` (não `D_FORN_FORNECEDOR`), FK `ID_FRND_FORNECEDOR_COMPRA` |
-| Fevereiro/2026 | 2.0.7 | Correção: JOIN material/serviço via `f_item.ID_ITCP_TP_COD_MAT_SERV` (da fato, não via d_item) |
-| Fevereiro/2026 | 2.0.7 | Correção: `numero_item` via `RIGHT(CH_ITCP_ITEM_COMPRA, 5)`, `quantidade_solicitada` via `QT_ITCP_SOLICITADA` |
-| Fevereiro/2026 | 2.0.7 | Adicionadas 6 dimensões do fornecedor: tipo pessoa, natureza jurídica, porte (via tabela separada), UF, município, região |
-| Fevereiro/2026 | 2.0.7 | Adicionados campos: `VL_ITCP_PRECO_UNIT_ESTIM`, `VL_PRECO_UNIT_HOMOLOG`, `QT_OFERTADA`, `DT_ULT_HOMOLOGACAO`, `prazo_dias` |
-| Fevereiro/2026 | 2.0.7 | Adicionadas 8 dimensões indicadoras do item: critério julgamento, critério valor, grupo compra, desempate ME, tipo objeto, sigilo (desc), sit. catálogo, PDM |
-| Fevereiro/2026 | 2.0.7 | Novo §17.2.3: documentação completa dos campos adicionais do Siasg DW e correção do JOIN de classificação |
-| Março/2026 | **2.0.8** | **Correção crítica: `valor_estimado` no FaseExterna é SEMPRE unitário** — não depende de SRP/Normal. Views de itens e licitações corrigidas. |
-| Março/2026 | 2.0.8 | Correção: `valor_adjudicado_calculado` no FaseExterna — sempre multiplicar quantidade × valor unitário (§5.2 atualizado) |
-| Março/2026 | 2.0.8 | Correção: `valor_estimado_total`, `valor_estimado_sigiloso`, `valor_adjudicado_total`, `valor_adjudicado_sigiloso` na `vw_licitacoes_faseexterna_sc` |
-| Março/2026 | 2.0.8 | Correção: `numero_grupo` no Comprasnet — valores sentinela (0, -1, -2, -3) tratados como NULL (§17.2.4) |
-| Março/2026 | 2.0.8 | Melhoria: `prazo_dias` calculado na SP via `DATEDIFF(data_primeira_publicacao, data_abertura)` da view de licitações, cobrindo todas as fontes (§17.2.5) |
-| Março/2026 | 2.0.8 | Melhoria: `#temp_censura` ampliada para 5 campos (+ `data_primeira_publicacao`, `data_abertura`) |
-| Março/2026 | 2.0.8 | Correção: `criterio_valor` — CAST para VARCHAR(50) nas 3 partes da consolidada (Comprasnet era SMALLINT, causava erro com valor 'E' do FaseExterna) |
-| Março/2026 | 2.0.8 | Correção: `id_fornecedor` — CAST para VARCHAR(20) (contém CNPJ, estourava INT); `ID_ITCP_PADRAO_DESC_MAT` — CAST para VARCHAR(10) |
-| Março/2026 | 2.0.8 | Correção: `codigo_item_catalogo` — CAST para VARCHAR(50) nas 3 partes da consolidada (conflito INT vs VARCHAR no UNION) |
-| Março/2026 | 2.0.8 | Correção: JOIN FaseExterna com DW — `TRY_CAST(codigo_item_catalogo AS INT)` para evitar falha na conversão de valores não-numéricos |
-| Março/2026 | 2.0.8 | **Correção: duplicação de itens no FaseExterna** — `D_ITCP_MATERIAL_SERVICO` não é PK única (mesmo código como Material e Serviço). JOIN desambiguado com `tipo_item_catalogo` (§17.4.5) |
-| Março/2026 | 2.0.8 | Melhoria: `valor_unitario_homologado` agora disponível no FaseExterna — calculado como `COALESCE(valor_negociado, valor_lance, melhor_valor)` (§17.3.1) |
-| Março/2026 | **2.0.9** | **Correção crítica: `item.homologado` removido das condições de valor adjudicado** — campo não confiável (35% falsos negativos). Proposta `situacao='6'` é condição suficiente (§5.1, §5.2). |
-| Março/2026 | 2.0.9 | Correção em `vw_itens_faseexterna_sc`: `valor_unitario_homologado` e `valor_adjudicado_calculado` não exigem mais `homologado='S'` |
-| Março/2026 | 2.0.9 | Correção em `vw_licitacoes_faseexterna_sc`: `valor_adjudicado_total` e `valor_adjudicado_sigiloso` não exigem mais `homologado='S'` |
-| Março/2026 | 2.0.9 | Análise: 159.943 de 456.276 licitações homologadas (35%) tinham propostas adjudicadas com `item.homologado='N'` — valores adjudicados estavam zerados |
-| Março/2026 | 2.0.9 | **Correção: ROW_NUMBER com desempate por `id DESC`** — itens recriados com novos IDs e mesma `versao` causavam seleção aleatória do registro (§14.1.1) |
-| Março/2026 | 2.0.9 | Correção aplicada em `vw_itens_faseexterna_sc` e `vw_licitacoes_faseexterna_sc` (CTEs `compras_recentes` e `itens_recentes`) |
-| Março/2026 | 2.0.9 | Melhoria: `valor_proposta_calculado` adicionado como 4º fallback na hierarquia de valores adjudicados (§5.2) — resolve Concorrências com modo "Fechado" sem lances |
-| Março/2026 | 2.0.9 | Documentação: §14.5 — 10.206 licitações do FaseExterna (2%) sem itens carregados, valores zerados. Limitação de dados das fontes. |
-
-
+| Abril/2024 | 1.0 | Criação inicial do painel |
+| Outubro/2024 | 1.2 | Renomeação para Monitor de Compras |
+| Janeiro/2026 | 2.0 | Refatoração completa das views |
+| Janeiro/2026 | 2.1 | Adição de campos `data_primeira_publicacao` e `data_publicacao_fonte` |
+| Janeiro/2026 | 2.1 | Correção de tipos NULL na view de itens Comprasnet para compatibilidade UNION |
+| Janeiro/2026 | 2.2 | Adição de campo `data_ultima_publicacao` |
+| Janeiro/2026 | 2.2 | Correção de duplicatas: ROW_NUMBER na tb_compras ordenando por dataAlteracao |
+| Janeiro/2026 | 2.2 | Correção de duplicatas: GROUP BY na vw_siasg_situacao_sc |
+| Janeiro/2026 | 2.3 | **Integração do Siasg como terceira fonte de dados** |
+| Janeiro/2026 | 2.3 | Criação da view `vw_licitacoes_siasg_sc` |
+| Janeiro/2026 | 2.3 | Atualização da `vw_licitacoes_consolidada_sc` para UNION de 3 fontes |
+| Janeiro/2026 | 2.3 | Remoção de campos da jurisdicionadas das views (relacionamento feito no Power BI) |
+| Janeiro/2026 | 2.3 | Expansão do mapeamento de situações do Siasg |
+| Janeiro/2026 | 2.3 | Documentação: considerações técnicas para consultas ao Siasg |
+| Fevereiro/2026 | 2.4 | **Integração do PNCP como quarta fonte de dados** |
+| Fevereiro/2026 | 2.4 | Criação da view `vw_disp_inex_pncp_sc` para Dispensas e Inexigibilidades |
+| Fevereiro/2026 | 2.4 | Atualização da `vw_licitacoes_consolidada_sc` para UNION de 4 fontes |
+| Fevereiro/2026 | 2.4 | Documentação: mapeamento completo do PNCP (modalidades, situações, valores) |
+| Fevereiro/2026 | 2.5 | **Nova hierarquia de prioridade para ITENS** (diferente de licitações) |
+| Fevereiro/2026 | 2.5 | Criação da view `vw_itens_siasg_sc` — itens do Siasg DW com fornecedor e classificação completa |
+| Fevereiro/2026 | 2.5 | Criação da `sp_itens_licitacoes_pbi` — Stored Procedure para Power BI com censura (resolve timeout >1h) |
+| Fevereiro/2026 | 2.5 | Documentação: hierarquia de classificação material/serviço (codconjmat ↔ ID_ITCP_MATERIAL_SERVICO) |
+| Fevereiro/2026 | 2.5 | Documentação: correspondência de códigos Comprasnet ↔ Siasg DW (mesma origem SIASG mainframe) |
+| Fevereiro/2026 | 2.5 | Documentação: problema de performance e solução com tabela temporária como barreira de otimização |
+| Fevereiro/2026 | 2.5 | Documentação: regras de censura de sigilo a nível de item (9 campos zerados) |
+| Fevereiro/2026 | 2.6 | **Reorganização: criação do §19 — Regras de Negócio de Itens** (centraliza todas as regras de itens) |
+| Fevereiro/2026 | 2.6 | Movidos para §19: hierarquia de prioridade de itens (ex-§2.1.1), classificação material/serviço (ex-§15A), performance (ex-§15B), fornecedor vencedor (ex-§5.4) |
+| Fevereiro/2026 | 2.6 | Novo §19.2: campos `qtd_lances_item` e `qtd_fornecedores_propostas` — decisões técnicas e disponibilidade por fonte |
+| Fevereiro/2026 | 2.6 | Documentação: `QT_ITCP_LANCES_ITEM` (Siasg DW) não tem equivalente no FaseExterna (apenas estado final por fornecedor, sem histórico de lances) |
+| Fevereiro/2026 | 2.6 | Documentação: `qtde_propostas_melhor_valor` do FaseExterna retorna -1 na maioria dos casos (campo não confiável) |
+| Fevereiro/2026 | 2.7 | **Correção `vw_itens_siasg_sc` v2.0** — JOINs corrigidos conforme consulta original `vw_valor_homologado_siasg_sc` |
+| Fevereiro/2026 | 2.7 | Correção: tabela fornecedor `D_FRND_FORNECEDOR` (não `D_FORN_FORNECEDOR`), FK `ID_FRND_FORNECEDOR_COMPRA` |
+| Fevereiro/2026 | 2.7 | Correção: JOIN material/serviço via `f_item.ID_ITCP_TP_COD_MAT_SERV` (da fato, não via d_item) |
+| Fevereiro/2026 | 2.7 | Correção: `numero_item` via `RIGHT(CH_ITCP_ITEM_COMPRA, 5)`, `quantidade_solicitada` via `QT_ITCP_SOLICITADA` |
+| Fevereiro/2026 | 2.7 | Adicionadas 6 dimensões do fornecedor: tipo pessoa, natureza jurídica, porte (via tabela separada), UF, município, região |
+| Fevereiro/2026 | 2.7 | Adicionados campos: `VL_ITCP_PRECO_UNIT_ESTIM`, `VL_PRECO_UNIT_HOMOLOG`, `QT_OFERTADA`, `DT_ULT_HOMOLOGACAO`, `prazo_dias` |
+| Fevereiro/2026 | 2.7 | Adicionadas 8 dimensões indicadoras do item: critério julgamento, critério valor, grupo compra, desempate ME, tipo objeto, sigilo (desc), sit. catálogo, PDM |
+| Fevereiro/2026 | 2.7 | Novo §17.2.3: documentação completa dos campos adicionais do Siasg DW e correção do JOIN de classificação |
+| Março/2026 | 2.8 | **Correção crítica: `valor_estimado` no FaseExterna é SEMPRE unitário** — não depende de SRP/Normal. Views de itens e licitações corrigidas. |
+| Março/2026 | 2.8 | Correção: `valor_adjudicado_calculado` no FaseExterna — sempre multiplicar quantidade × valor unitário (§5.2 atualizado) |
+| Março/2026 | 2.8 | Correção: `valor_estimado_total`, `valor_estimado_sigiloso`, `valor_adjudicado_total`, `valor_adjudicado_sigiloso` na `vw_licitacoes_faseexterna_sc` |
+| Março/2026 | 2.8 | Correção: `numero_grupo` no Comprasnet — valores sentinela (0, -1, -2, -3) tratados como NULL (§17.2.4) |
+| Março/2026 | 2.8 | Melhoria: `prazo_dias` agora calculado na SP via `DATEDIFF(data_primeira_publicacao, data_abertura)` da view de licitações, cobrindo todas as fontes (§17.2.5) |
+| Março/2026 | 2.8 | Melhoria: `#temp_censura` ampliada para 5 campos (+ `data_primeira_publicacao`, `data_abertura`) |
+| Março/2026 | 2.8 | Correção: `criterio_valor` — CAST para VARCHAR(50) nas 3 partes da consolidada (Comprasnet era SMALLINT, causava erro com valor 'E' do FaseExterna) |
+| Março/2026 | 2.8 | Correção: `id_fornecedor` — CAST para VARCHAR(20) (contém CNPJ, estourava INT); `ID_ITCP_PADRAO_DESC_MAT` — CAST para VARCHAR(10) |
+| Março/2026 | 2.8 | Correção: `codigo_item_catalogo` — CAST para VARCHAR(50) nas 3 partes da consolidada (conflito INT vs VARCHAR no UNION) |
+| Março/2026 | 2.8 | Correção: JOIN FaseExterna com DW — `TRY_CAST(codigo_item_catalogo AS INT)` para evitar falha na conversão de valores não-numéricos |
+| Março/2026 | 2.8 | **Correção: duplicação de itens no FaseExterna** — `D_ITCP_MATERIAL_SERVICO` não é PK única (mesmo código como Material e Serviço). JOIN desambiguado com `tipo_item_catalogo` (§17.4.5) |
+| Março/2026 | 2.8 | Melhoria: `valor_unitario_homologado` agora disponível no FaseExterna — calculado como `COALESCE(valor_negociado, valor_lance, melhor_valor)` (§17.3.1) || Março/2026 | 2.9 | **Correção crítica: `item.homologado` removido das condições de valor adjudicado** — campo não confiável (35% falsos negativos). Proposta `situacao='6'` é condição suficiente (§5.1, §5.2). |
+| Março/2026 | 2.9 | Correção em `vw_itens_faseexterna_sc`: `valor_unitario_homologado` e `valor_adjudicado_calculado` não exigem mais `homologado='S'` |
+| Março/2026 | 2.9 | Correção em `vw_licitacoes_faseexterna_sc`: `valor_adjudicado_total` e `valor_adjudicado_sigiloso` não exigem mais `homologado='S'` |
+| Março/2026 | 2.9 | Análise: 159.943 de 456.276 licitações homologadas (35%) tinham propostas adjudicadas com `item.homologado='N'` — valores adjudicados estavam zerados |
+| Março/2026 | 2.9 | **Correção: ROW_NUMBER com desempate por `id DESC`** — itens recriados com novos IDs e mesma `versao` causavam seleção aleatória do registro (§14.1.1) |
+| Março/2026 | 2.9 | Correção aplicada em `vw_itens_faseexterna_sc` e `vw_licitacoes_faseexterna_sc` (CTEs `compras_recentes` e `itens_recentes`) |
+| Março/2026 | 2.9 | Melhoria: `valor_proposta_calculado` adicionado como 4º fallback na hierarquia de valores adjudicados (§5.2) — resolve Concorrências com modo "Fechado" sem lances |
+| Março/2026 | 2.9 | Documentação: §14.5 — 10.206 licitações do FaseExterna (2%) sem itens carregados, valores zerados. Limitação de dados das fontes. |
+| Março/2026 | 2.9 | Melhoria: enriquecimento de dados do fornecedor via `db_cnpj.dbo.CNPJ` na SP — UF, município, porte, natureza jurídica (§17.3.4) |
+| Março/2026 | 2.9 | Melhoria: filtro `numero_item > 0` na SP e `vw_licitacoes_faseexterna_sc` — exclui cabeçalhos de grupo (dupla contagem) |
+| Março/2026 | 2.9 | Melhoria: `ABS(numero_grupo)` na SP — normaliza grupos negativos do FaseExterna |
+| Março/2026 | 2.9 | Melhoria: mapeamento de `criterio_julgamento_item` e `criterio_valor` na SP — códigos normalizados para descrição |
+| Abril/2026 | 2.10 | **Link PNCP na `Consulta_LicitacoesSC_PBI`** — URL usa `sequencialcompra` (não `numerocompra`). JOIN com `orgao` para obter CNPJ (§16.7) |
+| Abril/2026 | 2.10 | Documentação: §16.1 — PNCP exclusivo da Lei 14.133/2021, numeração sequencial por CNPJ+ano, sem colisão de modalidades |
+| Abril/2026 | 2.10 | Melhoria: `Natureza Jur. Fornecedor` agora traz descrição via JOIN com `db_cnpj.dbo.NaturezaJuridica` (§17.3.4) |
+| Abril/2026 | 2.10 | Melhoria: `Tipo Natureza Jur. Fornecedor` — campo novo via `db_cnpj.dbo.TipoNaturezaJuridica` (ex: "ENTIDADES EMPRESARIAIS") |
+| Abril/2026 | 2.10 | Melhoria: `Porte Fornecedor` mapeado para descrição (ME/EPP/Demais) via CASE na temp table (§17.3.4) |
+| Abril/2026 | 2.10 | Documentação: §17.2.6 — mapeamento completo de `criterio_julgamento_item` e `criterio_valor` (2 codificações do FaseExterna + Comprasnet + Siasg) |
+| Abril/2026 | 2.10 | Documentação: §17.2.7 — campos removidos da SP (Tipo Mat/Serv Descrição, ID Tipo Mat/Serv, Valor Sigiloso) |
+| Abril/2026 | 2.10 | Documentação: §17.2.8 — cabeçalhos de grupo (numero_item negativo) com exemplo e tratamento |
+| Abril/2026 | 2.10 | Documentação: §2.2 — Fontes Auxiliares (db_cnpj, Alice, Jurisdicionadas, e-Aud) adicionadas como bases de enriquecimento/referência |
