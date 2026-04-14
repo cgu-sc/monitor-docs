@@ -1,7 +1,7 @@
 # Regras de Negócio - Monitor de Compras SC
 
 ## Documento de Especificação Técnica
-**Versão:** 2.0.10  
+**Versão:** 2.0.11  
 **Data:** Abril/2026  
 **Projeto:** Monitor de Compras - CGU/SC
 
@@ -261,7 +261,53 @@ END
 #### Hierarquia de Quantidades:
 1. `item.qtde_adjudicada` (prioridade)
 2. `proposta.quantidade_ofertada`
-3. `item.quantidade_solicitada` (fallback adicionado v2.0.8)
+3. `item.quantidade_solicitada` (fallback adicionado na v2.0.8)
+
+> **Nota v2.0.11:** Quantidades negativas (erro de cadastro na fonte) são tratadas com a função `ABS()` na SP para evitar valores estimados negativos. O tratamento foi implementado após a constatação dessa inconsistência na [Contratação Direta nº 283/2025](https://pncp.gov.br/app/editais/83899526000182/2025/282).
+
+### 5.2.1 Adjudicação por Grupo no FaseExterna (v2.0.11)
+
+> **Achado de 14/04/2026:** No FaseExterna, **100% dos grupos adjudicados** têm a proposta adjudicada (`situacao = '6'`) **somente no cabeçalho do grupo** (`numero_item` negativo), **nunca nos subitens individuais**.
+>
+> **Verificação empírica:**
+> ```sql
+> -- Quantos grupos têm adjudicação SÓ no cabeçalho (sem subitens adjudicados)?
+> SELECT COUNT(*) AS total_grupos_com_adj,
+>        SUM(CASE WHEN subitens_adj = 0 THEN 1 ELSE 0 END) AS adj_so_no_grupo,
+>        SUM(CASE WHEN subitens_adj > 0 THEN 1 ELSE 0 END) AS adj_nos_subitens
+> FROM (
+>     SELECT g.id,
+>         SUM(CASE WHEN sub_p.situacao = '6' THEN 1 ELSE 0 END) AS subitens_adj
+>     FROM db_compras.ComprasGov_FaseExterna.item g
+>     JOIN db_compras.ComprasGov_FaseExterna.proposta_item gp ON gp.id_item = g.id AND gp.situacao = '6'
+>     LEFT JOIN db_compras.ComprasGov_FaseExterna.item sub
+>         ON sub.numero_uasg = g.numero_uasg AND sub.numero_compra = g.numero_compra
+>         AND sub.ano_compra = g.ano_compra AND sub.codigo_modalidade = g.codigo_modalidade
+>         AND sub.numero_grupo = g.numero_item AND sub.numero_item > 0
+>     LEFT JOIN db_compras.ComprasGov_FaseExterna.proposta_item sub_p ON sub_p.id_item = sub.id AND sub_p.situacao = '6'
+>     WHERE g.numero_item < 0 AND g.ano_compra >= 2022
+>     GROUP BY g.id
+> ) x
+> ```
+> **Resultado (14/04/2026):**
+>
+> | total_grupos_com_adj | adj_so_no_grupo | adj_nos_subitens |
+> |---|---|---|
+> | 116.094 | **116.094** | **0** |
+
+**Regra implementada na `vw_licitacoes_faseexterna_sc`:**
+
+| Tipo de item | Valor estimado | Valor adjudicado |
+|---|---|---|
+| **Subitem de grupo** (`numero_item > 0`, `numero_grupo < 0`) | ✅ Usar (unitário × qtd) | ❌ Nunca tem adjudicação própria |
+| **Cabeçalho de grupo** (`numero_item < 0`) | ❌ Não usar (dupla contagem) | ✅ Usar (valor já é TOTAL do grupo) |
+| **Item avulso** (`numero_item > 0`, `numero_grupo IS NULL`) | ✅ Usar (unitário × qtd) | ✅ Usar (unitário × qtd) |
+
+**Diferença no cálculo:**
+- **Cabeçalhos de grupo:** O valor da proposta adjudicada já é o **total** do grupo (não unitário). Portanto, **NÃO** se multiplica por quantidade.
+- **Itens avulsos:** O valor da proposta é **unitário**. Multiplicar por quantidade normalmente.
+
+**Exemplo real:** Pregão 90274/2025, UASG 155913 — 30 itens em 13 grupos, todos adjudicados. Valor total homologado (termo de homologação): R$ 3.728.490,27. Antes da correção, o painel mostrava R$ 99.232,80 (apenas 2 itens avulsos).
 
 ### 5.3 Regra para Comprasnet - Limitação da Versão CGU
 
@@ -550,12 +596,25 @@ A view `vw_jurisdicionadas_sc` define as UASGs de Santa Catarina jurisdicionadas
 - Cruza com Portal da Transparência para obter UG correta
 - Filtra por `UF = 'SC'`
 
-### 10.2 Filtro Temporal
+### 10.2 Filtro Temporal (atualizado v2.0.11)
 
-Todas as views de licitações filtram por `ano_compra >= 2022` para:
-- Melhor performance
-- Foco em dados recentes
-- Consistência com o escopo do projeto
+O filtro temporal opera em **duas camadas**:
+
+**Camada 1 — Views base (filtro amplo com margem de segurança):**
+
+| View | Filtro | Justificativa |
+|------|--------|---------------|
+| **FaseExterna** | Nenhum | Sistema novo (Lei 14.133/2021), não tem dados antigos |
+| **Comprasnet** | `ano_compra >= 2021` | 1 ano de margem — licitações numeradas 2021 publicadas em 2022 |
+| **Siasg** | `YEAR(DT_CMPR_RESULTADO) >= 2020` | 2 anos de margem — licitações podem ficar suspensas. Volume limitado (DW parou abr/2024) |
+| **PNCP** | `YEAR(datapublicacaopncp) >= 2022` | Já filtra pela data de publicação real |
+
+**Camada 2 — Consulta PBI (filtro final exato):**
+```sql
+WHERE YEAR(d.data_primeira_publicacao) >= 2022
+```
+
+> **Justificativa da abordagem em 2 camadas (v2.0.11):** O campo relevante para o demandante é a **data de publicação** (quando a licitação se tornou pública), não o ano da numeração (`ano_compra`). Uma licitação "Pregão 51/2021" pode ser publicada em jan/2022 se o processo interno atrasou. Filtrar apenas por `ano_compra >= 2022` nas views excluiria essa licitação. A margem nas views base garante que a `Consulta_PBI` receba todos os registros potencialmente relevantes e faça o corte correto pela `data_primeira_publicacao`.
 
 ---
 
@@ -1439,9 +1498,9 @@ Os campos `criterio_julgamento_item` e `criterio_valor` vêm como **códigos** n
 | `Tipo Mat/Serv Descrição` (`DS_ITCP_TP_MATERIAL_SERVICO`) | Redundante e frequentemente em branco (depende do JOIN com DW) |
 | `ID Valor Sigiloso` e `Valor Sigiloso` | Redundantes com `Orçamento Sigiloso` (mesmo dado, fontes diferentes) |
 
-#### 17.2.8 Cabeçalhos de Grupo — Exclusão de Itens Negativos (v2.0.9)
+#### 17.2.8 Cabeçalhos de Grupo — Tratamento Diferenciado (v2.0.9, atualizado v2.0.11)
 
-No FaseExterna, itens com `numero_item` negativo são **cabeçalhos de grupo** (totalizadores). Eles contêm o valor estimado total do grupo (soma dos subitens) e causam **dupla contagem** se incluídos nas agregações.
+No FaseExterna, itens com `numero_item` negativo são **cabeçalhos de grupo** (totalizadores). Eles contêm o valor estimado total do grupo (soma dos subitens) e a **proposta adjudicada do grupo inteiro**.
 
 **Exemplo:** Pregão 90014/2025, UASG 158517
 | numero_item | numero_grupo | valor_estimado | qtd | Tipo |
@@ -1450,12 +1509,18 @@ No FaseExterna, itens com `numero_item` negativo são **cabeçalhos de grupo** (
 | 1 | -8 | 6,55 | 100.000 | Subitem do Grupo 8 |
 | 2 | -8 | 22,02 | 5.000 | Subitem do Grupo 8 |
 
-**Tratamento na SP:**
-- `WHERE i.numero_item > 0 OR i.numero_item IS NULL` — exclui cabeçalhos
+**Tratamento na SP (tabela de itens no Power BI):**
+- `WHERE i.numero_item > 0 OR i.numero_item IS NULL` — exclui cabeçalhos (só mostra subitens)
 - `ABS(i.numero_grupo) AS 'Nº Grupo'` — normaliza negativos para positivos
+- `ABS(i.quantidade_solicitada)` — trata quantidades negativas (erro de cadastro)
 
-**Tratamento na `vw_licitacoes_faseexterna_sc`:**
-- `AND (i.numero_item > 0 OR i.numero_item IS NULL)` no JOIN da `valores_agregados` — evita dupla contagem nos totais
+**Tratamento na `vw_licitacoes_faseexterna_sc` (v2.0.11):**
+A CTE `valores_agregados` traz **todos os itens** (positivos e negativos) e usa lógica condicional:
+- **Valor estimado:** soma apenas subitens (`numero_item > 0`) — evita dupla contagem
+- **Valor adjudicado:** soma cabeçalhos de grupo (`numero_item < 0`) + itens avulsos (`numero_item > 0 AND numero_grupo IS NULL`) — captura adjudicações que só existem no grupo
+- **Contagens:** apenas subitens (`numero_item > 0`)
+
+> Ver §5.2.1 para a regra completa e a verificação empírica que a justificou.
 
 ### 17.3 Fornecedor Vencedor e Valores Adjudicados por Fonte
 
@@ -1871,3 +1936,7 @@ EXEC temp_CGUSC.compras.sp_itens_licitacoes_pbi
 | Abril/2026 | 2.0.10 | Documentação: §17.2.7 — campos removidos da SP (Tipo Mat/Serv Descrição, ID Tipo Mat/Serv, Valor Sigiloso) |
 | Abril/2026 | 2.0.10 | Documentação: §17.2.8 — cabeçalhos de grupo (numero_item negativo) com exemplo e tratamento |
 | Abril/2026 | 2.0.10 | Documentação: §2.2 — Fontes Auxiliares (db_cnpj, Alice, Jurisdicionadas, e-Aud) adicionadas como bases de enriquecimento/referência |
+| Abril/2026 | **2.0.11** | **Correção crítica: adjudicação por grupo no FaseExterna** — 100% dos grupos (116.094) têm adjudicação somente no cabeçalho, nunca nos subitens. View de licitações reescrita com lógica condicional (§5.2.1, §17.2.8) |
+| Abril/2026 | 2.0.11 | Correção em `vw_licitacoes_faseexterna_sc`: `valores_agregados` agora traz todos os itens (positivos e negativos); estimado = subitens, adjudicado = cabeçalhos + avulsos |
+| Abril/2026 | 2.0.11 | **Revisão filtros temporais**: FaseExterna sem filtro, Comprasnet `>= 2021` (era 2022), Siasg `>= 2020` (era 2022). Consulta PBI filtra por `data_primeira_publicacao >= 2022` (§10.2) |
+| Abril/2026 | 2.0.11 | Melhoria: `ABS()` em quantidades na SP — quantidades negativas (erro de cadastro) agora positivas |
