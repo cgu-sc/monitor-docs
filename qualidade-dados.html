@@ -16,7 +16,7 @@
       <span class="brand-title">Monitor <em>de</em> Compras</span>
     </div>
   </a>
-  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+  <div class="header-right"><span class="version-pill">v2.0.11 — Abr/2026</span></div>
 </header>
 
 <nav class="tab-nav">
@@ -41,9 +41,9 @@
     <span class="badge badge-tecnico">⚙ Técnico</span>
     <p class="section-desc">Todos os problemas foram descobertos por investigação empírica — não por suposição. Cada item tem diagnóstico quantificado, impacto e decisão documentados.</p>
     <div class="stat-row">
-      <div class="stat-card teal"><span class="stat-label">Correções aplicadas</span><span class="stat-value">7</span></div>
+      <div class="stat-card teal"><span class="stat-label">Correções aplicadas</span><span class="stat-value">8</span></div>
       <div class="stat-card amber"><span class="stat-label">Limitações aceitas</span><span class="stat-value">4</span></div>
-      <div class="stat-card neutral"><span class="stat-label">Última correção</span><span class="stat-value" style="font-size:18px;margin-top:4px;">v2.0.9</span></div>
+      <div class="stat-card neutral"><span class="stat-label">Última correção</span><span class="stat-value" style="font-size:18px;margin-top:4px;">v2.0.11</span></div>
     </div>
   </div>
 
@@ -58,7 +58,7 @@
         <div>
           <div class="issue-title">item.homologado = 'S' como filtro de valor adjudicado</div>
           <div class="issue-tags">
-            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.9</span>
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.11</span>
             <span class="issue-tag tag-fonte">FaseExterna</span>
           </div>
         </div>
@@ -83,7 +83,7 @@
         <div>
           <div class="issue-title">ROW_NUMBER sem desempate por id DESC — seleção aleatória de itens recriados</div>
           <div class="issue-tags">
-            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.9</span>
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.11</span>
             <span class="issue-tag tag-fonte">FaseExterna</span>
           </div>
         </div>
@@ -210,6 +210,57 @@
   </div>
 
   <!-- LIMITAÇÕES -->
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-critical">🔴</div>
+        <div>
+          <div class="issue-title">Adjudicação por grupo no FaseExterna — lógica incorreta nos subitens</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.11</span>
+            <span class="issue-tag tag-fonte">FaseExterna</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>Nas versões anteriores, o cálculo de <code>valor_adjudicado_total</code> tentava capturar adjudicação tanto nos subitens quanto nos cabeçalhos de grupo. Investigação empírica em 14/04/2026 revelou que <strong>100% dos grupos adjudicados</strong> têm a proposta adjudicada registrada exclusivamente no cabeçalho (<code>numero_item &lt; 0</code>), nunca nos subitens individuais.</p>
+        <div class="stat-pills">
+          <div class="stat-pill"><span class="sp-val">116.094</span><span class="sp-lbl">Grupos verificados</span></div>
+          <div class="stat-pill"><span class="sp-val teal">100%</span><span class="sp-lbl">Com adjudicação apenas no cabeçalho</span></div>
+          <div class="stat-pill"><span class="sp-val">0</span><span class="sp-lbl">Grupos com adjudicação nos subitens</span></div>
+        </div>
+        <div class="fix-banner">
+          <span>✅</span>
+          <div><strong>Correção:</strong> <code>valores_agregados</code> reescrita com lógica condicional: valor estimado = apenas subitens (<code>numero_item &gt; 0</code>); valor adjudicado = cabeçalhos de grupo (<code>numero_item &lt; 0</code>) + itens avulsos sem grupo. Cabeçalhos já trazem o valor total do grupo — não multiplicar por quantidade.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="issue-card">
+      <div class="issue-header">
+        <div class="issue-severity sev-critical">🔴</div>
+        <div>
+          <div class="issue-title">Adjudicação por grupo — lógica incorreta nos subitens</div>
+          <div class="issue-tags">
+            <span class="issue-tag tag-fixed">✓ Corrigido v2.0.11</span>
+            <span class="issue-tag tag-fonte">FaseExterna</span>
+          </div>
+        </div>
+      </div>
+      <div class="issue-body">
+        <p>Nas versões anteriores, o cálculo de <code>valor_adjudicado_total</code> tentava capturar adjudicação tanto nos subitens quanto nos cabeçalhos de grupo. Investigação empírica em 14/04/2026 revelou que <strong>100% dos grupos adjudicados</strong> têm a proposta registrada exclusivamente no cabeçalho (<code>numero_item &lt; 0</code>), nunca nos subitens.</p>
+        <div class="stat-pills">
+          <div class="stat-pill"><span class="sp-val">116.094</span><span class="sp-lbl">Grupos verificados</span></div>
+          <div class="stat-pill"><span class="sp-val teal">100%</span><span class="sp-lbl">Adjudicação apenas no cabeçalho</span></div>
+          <div class="stat-pill"><span class="sp-val">0</span><span class="sp-lbl">Grupos com adj. nos subitens</span></div>
+        </div>
+        <div class="fix-banner">
+          <span>✅</span>
+          <div><strong>Correção:</strong> CTE <code>valores_agregados</code> reescrita com lógica condicional: valor estimado = apenas subitens (<code>numero_item &gt; 0</code>); valor adjudicado = cabeçalhos (<code>numero_item &lt; 0</code>) + itens avulsos sem grupo. O cabeçalho já carrega o valor total do grupo — não multiplicar por quantidade.</div>
+        </div>
+      </div>
+    </div>
+
   <div class="section">
     <div class="section-eyebrow">Limitações Conhecidas</div>
     <h2 class="section-title">Problemas <em>Aceitos</em></h2>
@@ -288,6 +339,6 @@
 </div>
 <footer class="page-footer">
   <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
-  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+  <div>Documentação <span>v2.0.11</span> · Abril/2026</div>
 </footer>
 </body></html>

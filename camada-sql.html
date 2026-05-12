@@ -16,7 +16,7 @@
       <span class="brand-title">Monitor <em>de</em> Compras</span>
     </div>
   </a>
-  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+  <div class="header-right"><span class="version-pill">v2.0.11 — Abr/2026</span></div>
 </header>
 
 <nav class="tab-nav">
@@ -239,7 +239,7 @@
         <div class="view-badges"><span class="view-source amber">SP</span></div>
       </div>
       <div class="view-body">
-        <p>Resolve +1h → ~5–8 min via <code>#temp_censura</code> como barreira de otimização do SQL Server. Aplica censura de sigilo em 10 campos monetários quando <code>Situacao_Gerada = 'Não Homologada'</code> e <code>qtd_itens_sigilosos > 0</code>.</p>
+        <p>Resolve +1h → ~5–8 min via 3 tabelas temporárias (<code>#temp_censura</code>, <code>#temp_cnpjs_itens</code>, <code>#temp_cnpj</code>). Aplica censura de sigilo em 10 campos monetários e enriquece o fornecedor com dados da Receita Federal (<code>db_cnpj</code>): natureza jurídica, tipo e porte com descrição legível.</p>
 
         <div class="code-block">
           <div class="code-header"><span class="code-lang">SQL — Chamada no Power Query (modo Importação)</span></div>
@@ -271,6 +271,6 @@
 </div>
 <footer class="page-footer">
   <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
-  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+  <div>Documentação <span>v2.0.11</span> · Abril/2026</div>
 </footer>
 </body></html>

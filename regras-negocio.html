@@ -16,7 +16,7 @@
       <span class="brand-title">Monitor <em>de</em> Compras</span>
     </div>
   </a>
-  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+  <div class="header-right"><span class="version-pill">v2.0.11 — Abr/2026</span></div>
 </header>
 
 <nav class="tab-nav">
@@ -34,7 +34,7 @@
   <div class="page-top">
     <div class="page-eyebrow">Documentação / Regras de Negócio</div>
     <h1 class="page-title">Regras de <em>Negócio</em></h1>
-    <p class="page-subtitle">v2.0.9 · Março/2026 — Cálculos de valores, situações, sigilo e mapeamentos</p>
+    <p class="page-subtitle">v2.0.11 · Abril/2026 — Cálculos de valores, situações, sigilo e mapeamentos</p>
   </div>
 
   <!-- Cod_licitacao -->
@@ -110,9 +110,45 @@
       </table>
     </div>
 
+
+    <h3 class="sub-title">FaseExterna — Adjudicação por Grupo (v2.0.11)</h3>
+    <p class="section-desc" style="margin-bottom:12px;">No FaseExterna, licitações podem ter itens agrupados. O cabeçalho do grupo tem <code>numero_item &lt; 0</code> e carrega o valor total já consolidado do grupo. Os subitens (<code>numero_item &gt; 0</code>) nunca têm proposta adjudicada registrada.</p>
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Verificado empiricamente em 14/04/2026:</strong> 116.094 grupos analisados — 100% com adjudicação exclusivamente no cabeçalho. Por isso a CTE <code>valores_agregados</code> usa lógica condicional: valor estimado vem dos subitens; valor adjudicado vem dos cabeçalhos + itens avulsos (sem grupo).</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>numero_item</th><th>Significado</th><th>Valor estimado</th><th>Valor adjudicado</th></tr></thead>
+        <tbody>
+          <tr><td>&lt; 0</td><td>Cabeçalho de grupo</td><td>Ignorado (evita dupla contagem)</td><td>✅ Usar — já é o total do grupo</td></tr>
+          <tr><td>&gt; 0 sem grupo</td><td>Item avulso</td><td>✅ Usar</td><td>✅ Usar × quantidade</td></tr>
+          <tr><td>&gt; 0 com grupo</td><td>Subitem de grupo</td><td>✅ Usar</td><td>Ignorado — adjudicação está no cabeçalho</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="callout callout-warn">
       <span class="callout-icon">⚠️</span>
       <div><strong>Correção v2.0.9 — item.homologado removido:</strong> Nas versões anteriores, <code>item.homologado = 'S'</code> era condição obrigatória. Análise empírica revelou 35% de falsos negativos — 159.943 de 456.276 licitações homologadas tinham propostas adjudicadas com <code>item.homologado = 'N'</code>. A condição suficiente e confiável é <code>proposta.situacao = '6'</code>.</div>
+    </div>
+
+
+    <h3 class="sub-title">Filtros Temporais nas Views (v2.0.11)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Camada</th><th>Fonte</th><th>Filtro na view</th><th>Filtro final (Consulta PBI)</th></tr></thead>
+        <tbody>
+          <tr><td>View fonte</td><td>FaseExterna</td><td>Sem filtro</td><td rowspan="4" style="vertical-align:middle;"><code>YEAR(data_primeira_publicacao) &gt;= 2022</code></td></tr>
+          <tr><td>View fonte</td><td>Comprasnet</td><td><code>YEAR(datainclusao) &gt;= 2021</code></td></tr>
+          <tr><td>View fonte</td><td>Siasg DW</td><td><code>YEAR(DT_CMPR_RESULTADO_COMPRA) &gt;= 2020</code></td></tr>
+          <tr><td>View fonte</td><td>PNCP</td><td><code>YEAR(datapublicacaopncp) &gt;= 2022</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div>Os filtros mais amplos nas views de fonte evitam cortar licitações cujas datas de publicação no Alice (fonte preferencial) são mais recentes que a data de inclusão na base. O filtro exato de 2022 é aplicado uma única vez na <code>Consulta_LicitacoesSC_PBI</code>.</div>
     </div>
 
     <h3 class="sub-title">Comprasnet — via Siasg DW</h3>
@@ -238,7 +274,7 @@
         <div style="font-family:var(--f-ui);font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;">REGRAS_DE_NEGOCIO.md</div>
         <p style="font-size:13.5px;font-weight:300;color:var(--text-muted);line-height:1.6;max-width:480px;margin:0;">Esta página apresenta um resumo das principais regras. O documento completo de especificação técnica contém todas as seções detalhadas, tabelas de análise empírica e histórico completo de alterações.</p>
       </div>
-      <a href="REGRAS_DE_NEGOCIO.md" style="display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:white;text-decoration:none;padding:12px 22px;border-radius:var(--r);font-family:var(--f-ui);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;transition:background .18s;" onmouseover="this.style.background='var(--blue-dim)'" onmouseout="this.style.background='var(--blue)'" target="_blank">
+      <a href="REGRAS_DE_NEGOCIO.md" style="display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:white;text-decoration:none;padding:12px 22px;border-radius:var(--r);font-family:var(--f-ui);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;transition:background .18s;" onmouseover="this.style.background='var(--blue-dim)'" onmouseout="this.style.background='var(--blue)'">
         <span style="font-size:16px;">📄</span>
         Ver documento completo →
       </a>
@@ -248,6 +284,6 @@
 </div>
 <footer class="page-footer">
   <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
-  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+  <div>Documentação <span>v2.0.11</span> · Abril/2026</div>
 </footer>
 </body></html>

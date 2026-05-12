@@ -23,7 +23,7 @@
 
   <!-- Direita: versão -->
   <div class="header-right">
-    <span class="version-pill">v2.0.9 — Mar/2026</span>
+    <span class="version-pill">v2.0.11 — Abr/2026</span>
   </div>
 </header>
 
@@ -53,11 +53,15 @@
     <div class="hero-meta">
       <div class="hero-meta-item">
         <span class="lbl">Versão</span>
-        <span class="val">2.0.9 — Março/2026</span>
+        <span class="val">2.0.9 — Abril/2026</span>
       </div>
       <div class="hero-meta-item">
         <span class="lbl">Responsável Técnica</span>
         <span class="val">Tatiana Popia Corrêa — NEP/CGU-SC</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="lbl">Demandante</span>
+        <span class="val">João Marcelo Martins — NAC2</span>
       </div>
       <div class="hero-meta-item">
         <span class="lbl">Escopo Temporal</span>
@@ -182,6 +186,16 @@
         <div class="tl-title">item.homologado removido · ROW_NUMBER corrigido</div>
         <div class="tl-desc">35% de falsos negativos eliminados (159.943 licitações). <code>ORDER BY versao DESC, id DESC</code> corrige seleção aleatória. 4º fallback de valor adjudicado adicionado.</div>
       </div>
+      <div class="tl-item">
+        <div class="tl-date">Abril/2026<span class="tl-version">v2.0.10</span></div>
+        <div class="tl-title">Link PNCP e enriquecimento via db_cnpj</div>
+        <div class="tl-desc">Link PNCP gerado com <code>sequencialcompra</code>. Nova base auxiliar <code>db_cnpj</code> (Receita Federal) enriquece fornecedor com natureza jurídica, tipo e porte com descrição legível.</div>
+      </div>
+      <div class="tl-item major">
+        <div class="tl-date">Abril/2026<span class="tl-version">v2.0.11</span></div>
+        <div class="tl-title">Adjudicação por grupo · Filtros temporais · ABS() em quantidades</div>
+        <div class="tl-desc">100% dos grupos têm adjudicação somente no cabeçalho (<code>numero_item &lt; 0</code>) — lógica da view reescrita. Filtros temporais revisados: Comprasnet ≥ 2021, Siasg ≥ 2020, FaseExterna sem filtro. <code>ABS()</code> em quantidades negativas na SP.</div>
+      </div>
     </div>
 
     <h3 class="sub-title">Série v1.x — Primeira Geração (Abr/2024 – 2025)</h3>
@@ -273,7 +287,7 @@
 
 <footer class="page-footer">
   <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
-  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+  <div>Documentação <span>v2.0.11</span> · Abril/2026</div>
 </footer>
 
 </body>

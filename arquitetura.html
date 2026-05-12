@@ -17,7 +17,7 @@
       <span class="brand-title">Monitor <em>de</em> Compras</span>
     </div>
   </a>
-  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+  <div class="header-right"><span class="version-pill">v2.0.11 — Abr/2026</span></div>
 </header>
 
 <nav class="tab-nav">
@@ -55,7 +55,7 @@
             <div class="pipe-layer-title">Bases Brutas</div>
             <div style="font-size:12px;font-weight:300;color:var(--text-muted);margin-top:2px;">SQL Server — sistemas federais de origem</div>
           </div>
-          <span class="pipe-layer-sub">db_compras · db_dwsiasg · db_pncp · db_alice_consulta</span>
+          <span class="pipe-layer-sub">db_compras · db_dwsiasg · db_pncp · db_alice_consulta · db_cnpj</span>
         </div>
         <div class="pipe-layer-body">
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -65,6 +65,7 @@
             <div class="pipe-view teal">db_dwsiasg.dbo.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">Siasg DW · até abr/2024</div></div>
             <div class="pipe-view teal">db_pncp.dbo.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">PNCP · Disp./Inex.</div></div>
             <div class="pipe-view">db_alice_consulta.dbo.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">Alice · Datas/Alertas</div></div>
+            <div class="pipe-view">db_cnpj.dbo.*<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">Receita Federal · Fornecedor</div></div>
           </div>
         </div>
       </div>
@@ -150,11 +151,11 @@
           <div class="pipe-layer-num" style="background:var(--amber-bg);border:1px solid var(--amber-bdr);color:var(--amber-lt);">4</div>
           <div>
             <div class="pipe-layer-title">Stored Procedure</div>
-            <div style="font-size:12px;font-weight:300;color:var(--text-muted);margin-top:2px;">+1h → ~5–8 min · 10 campos monetários censurados</div>
+            <div style="font-size:12px;font-weight:300;color:var(--text-muted);margin-top:2px;">+1h → ~5–8 min · censura + enriquecimento via db_cnpj</div>
           </div>
         </div>
         <div class="pipe-layer-body">
-          <div class="pipe-view amber" style="max-width:420px;">sp_itens_licitacoes_pbi<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">#temp_censura como barreira de otimização do SQL Server</div></div>
+          <div class="pipe-view amber" style="max-width:420px;">sp_itens_licitacoes_pbi<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:300;">#temp_censura · #temp_cnpj · #temp_cnpjs_itens — 3 tabelas temporárias</div></div>
         </div>
       </div>
 
@@ -280,7 +281,7 @@
     <span class="badge badge-hibrido">🔀 Técnico + Gerencial</span>
     <div class="section-eyebrow">Camadas 4 e 5</div>
     <h2 class="section-title">Stored Procedure + <em>Power BI</em></h2>
-    <p class="section-desc">A stored procedure resolve dois problemas da <strong>consulta de itens de licitações</strong> simultaneamente: performance (de +1h para ~5–8 min) e censura de sigilo nos 10 campos monetários.</p>
+    <p class="section-desc">A stored procedure resolve três problemas da <strong>consulta de itens de licitações</strong> em sequência: <strong>performance</strong> (de +1h para ~5–8 min via tabelas temporárias), <strong>censura de sigilo</strong> nos 10 campos monetários, e <strong>enriquecimento do fornecedor</strong> com dados da Receita Federal (<code>db_cnpj</code>) — natureza jurídica, tipo e porte com descrição legível.</p>
 
     <div class="code-block">
       <div class="code-header">
@@ -323,6 +324,6 @@
 </div>
 <footer class="page-footer">
   <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
-  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+  <div>Documentação <span>v2.0.11</span> · Abril/2026</div>
 </footer>
 </body></html>

@@ -21,7 +21,7 @@
       <span class="brand-title">Monitor <em>de</em> Compras</span>
     </div>
   </a>
-  <div class="header-right"><span class="version-pill">v2.0.9 — Mar/2026</span></div>
+  <div class="header-right"><span class="version-pill">v2.0.11 — Abr/2026</span></div>
 </header>
 
 <nav class="tab-nav">
@@ -250,9 +250,30 @@
     </div>
   </div>
 
+  <div class="section">
+    <span class="badge badge-tecnico">⚙ Técnico</span>
+    <div class="section-eyebrow">Base Auxiliar de Enriquecimento</div>
+    <h2 class="section-title">db_cnpj — Receita <em>Federal</em></h2>
+    <p class="section-desc">Base de dados da Receita Federal com cadastro de CNPJs. Usada pela stored procedure <code>sp_itens_licitacoes_pbi</code> (desde v2.0.10) para enriquecer os dados do fornecedor com informações que as fontes de licitações não trazem.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tabela</th><th>Campos usados</th><th>Uso</th></tr></thead>
+        <tbody>
+          <tr><td>db_cnpj.dbo.CNPJ</td><td>RazaoSocial, UF, Municipio, CodPorteEmpresa</td><td>Nome, localização e porte do fornecedor</td></tr>
+          <tr><td>db_cnpj.dbo.NaturezaJuridica</td><td>DescNaturezaJuridica</td><td>Descrição da natureza jurídica (ex: "Sociedade Empresária Limitada")</td></tr>
+          <tr><td>db_cnpj.dbo.TipoNaturezaJuridica</td><td>DescTipoNaturezaJuridica</td><td>Tipo agrupador (ex: "Entidades Empresariais")</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Prioridade:</strong> O <code>db_cnpj</code> complementa fontes que não trazem essas dimensões (FaseExterna, Comprasnet). O Siasg DW já tem UF, município, porte e natureza jurídica via dimensões próprias — esses dados têm prioridade via <code>COALESCE</code> na SP.</div>
+    </div>
+  </div>
+
 </div>
 <footer class="page-footer">
   <div>Monitor de Compras SC · <span>CGU Regional Santa Catarina</span></div>
-  <div>Documentação <span>v2.0.9</span> · Março/2026</div>
+  <div>Documentação <span>v2.0.11</span> · Abril/2026</div>
 </footer>
 </body></html>
