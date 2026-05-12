@@ -225,6 +225,27 @@
     </div>
   </div>
 
+  <div class="section">
+    <div class="section-eyebrow">Views Auxiliares</div>
+    <h2 class="section-title">Views de <em>Alertas</em></h2>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div><div class="view-name">vw_alertas_alice_sc</div><div class="view-file">Alice — alertas de irregularidades</div></div>
+        <div class="view-badges"><span class="view-source">Alice</span></div>
+      </div>
+      <div class="view-body"><p>Alertas do Alice para licitações das UASGs de SC. Usada na <code>Consulta_LicitacoesSC_PBI</code> via LEFT JOIN para determinar o campo "Teve Alerta Alice?" — <code>DISTINCT</code> para evitar duplicação de linhas.</p></div>
+    </div>
+
+    <div class="view-item">
+      <div class="view-header">
+        <div><div class="view-name">vw_alice_eaud_integracao_sc</div><div class="view-file">Alice — integração e-CGU/e-Aud</div></div>
+        <div class="view-badges"><span class="view-source">Alice</span></div>
+      </div>
+      <div class="view-body"><p>Licitações de SC para as quais o Alice gerou tarefa no sistema e-Aud (e-CGU). Usada na <code>Consulta_LicitacoesSC_PBI</code> para determinar o campo "Alerta pelo e-Aud?" — <code>DISTINCT</code> para evitar duplicação.</p></div>
+    </div>
+  </div>
+
   <!-- STORED PROCEDURE -->
   <div class="section">
     <div class="section-eyebrow">Entrega ao Power BI</div>
@@ -262,9 +283,60 @@
 
         <div class="callout callout-info" style="margin-top:16px;">
           <span class="callout-icon">ℹ️</span>
-          <div><strong>Não censurados:</strong> <code>qtd_lances_item</code> e <code>qtd_fornecedores_propostas</code> — não revelam o orçamento sigiloso.</div>
+          <div><strong>Não censurados:</strong> <code>qtd_lances_item</code> e <code>qtd_fornecedores_propostas</code> — não revelam o orçamento sigiloso.<br><strong>ABS() aplicado (v2.0.11):</strong> <code>numero_grupo</code>, <code>quantidade_solicitada</code> e <code>quantidade_minima_solicitada</code> para tratar valores negativos de cadastro.</div>
         </div>
+
+        <h3 class="sub-title">Cabeçalhos de grupo filtrados na SP</h3>
+        <p style="font-size:13.5px;font-weight:300;color:var(--text-mid);margin-bottom:12px;line-height:1.65;">A SP entrega apenas subitens ao Power BI. Cabeçalhos (<code>numero_item &lt; 0</code>) são excluídos — já serviram para calcular o valor adjudicado na view de licitações, e exibi-los causaria duplicação no painel.</p>
+        <div class="code-block"><div class="code-header"><span class="code-lang">SQL — Filtro na SP</span></div>
+        <pre><code><span class="cm">-- Exclui cabeçalhos de grupo; mantém subitens e itens avulsos</span>
+<span class="kw">WHERE</span> i.numero_item &gt; <span class="num">0</span> <span class="kw">OR</span> i.numero_item <span class="kw">IS NULL</span></code></pre></div>
+
+        <h3 class="sub-title">Normalização de critérios (v2.0.10)</h3>
+        <p style="font-size:13.5px;font-weight:300;color:var(--text-mid);margin-bottom:12px;line-height:1.65;">FaseExterna e Comprasnet trazem critérios como <strong>códigos</strong>; Siasg DW traz como texto. A SP normaliza via CASE no SELECT final.</p>
+        <div class="table-wrap"><table><thead><tr><th>Critério de Julgamento</th><th>Código</th><th>Descrição</th></tr></thead><tbody>
+          <tr><td>FaseExterna / Comprasnet</td><td>1</td><td>Menor Preço</td></tr>
+          <tr><td>FaseExterna / Comprasnet</td><td>2</td><td>Maior Desconto</td></tr>
+          <tr><td>FaseExterna / Comprasnet</td><td>3</td><td>Melhor Técnica</td></tr>
+          <tr><td>FaseExterna / Comprasnet</td><td>4</td><td>Técnica e Preço</td></tr>
+          <tr><td>FaseExterna / Comprasnet</td><td>6</td><td>Maior Retorno Econômico</td></tr>
+          <tr><td>Siasg DW</td><td>(texto)</td><td>Passa direto</td></tr>
+        </tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Critério de Valor</th><th>Letra (FE)</th><th>Número (FE/CN)</th><th>Descrição</th></tr></thead><tbody>
+          <tr><td>FaseExterna / Comprasnet</td><td>E</td><td>2</td><td>Valor Estimado</td></tr>
+          <tr><td>FaseExterna / Comprasnet</td><td>M</td><td>1</td><td>Valor Máximo Aceitável</td></tr>
+          <tr><td>FaseExterna / Comprasnet</td><td>R</td><td>3</td><td>Valor de Referência</td></tr>
+          <tr><td>FaseExterna / Comprasnet</td><td>P</td><td>4</td><td>Prêmio / Remuneração</td></tr>
+          <tr><td>Siasg DW</td><td>(texto)</td><td>—</td><td>Passa direto</td></tr>
+        </tbody></table></div>
+        <div class="callout callout-info"><span class="callout-icon">ℹ️</span><div>O FaseExterna possui <strong>duas codificações</strong> para <code>criterio_valor</code>: letras (<code>CriterioValorItemEnum</code>) e números (<code>CriterioValorItemSiasgnetEnum</code>). A SP mapeia ambas.</div></div>
+
+        <h3 class="sub-title">Campos removidos da SP em v2.0.10</h3>
+        <div class="table-wrap"><table><thead><tr><th>Campo removido</th><th>Motivo</th></tr></thead><tbody>
+          <tr><td>ID Tipo Mat/Serv (<code>ID_ITCP_TP_MATERIAL_SERVICO</code>)</td><td>Redundante — <code>Tipo Mat/Serv</code> já traz "Material"/"Serviço"</td></tr>
+          <tr><td>Tipo Mat/Serv Descrição (<code>DS_ITCP_TP_MATERIAL_SERVICO</code>)</td><td>Redundante e frequentemente em branco</td></tr>
+          <tr><td>ID Valor Sigiloso / Valor Sigiloso</td><td>Redundantes com <code>Orçamento Sigiloso</code></td></tr>
+        </tbody></table></div>
       </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">Views Auxiliares</div>
+    <h2 class="section-title">Views de <em>Alertas</em></h2>
+    <div class="view-item">
+      <div class="view-header">
+        <div><div class="view-name">vw_alertas_alice_sc</div><div class="view-file">Alice — alertas de irregularidades</div></div>
+        <div class="view-badges"><span class="view-source">Alice</span></div>
+      </div>
+      <div class="view-body"><p>Alertas do Alice para licitações das UASGs de SC. Usada na <code>Consulta_LicitacoesSC_PBI</code> via LEFT JOIN com <code>SELECT DISTINCT Cod_licitacao</code> para gerar o campo "Teve Alerta Alice?".</p></div>
+    </div>
+    <div class="view-item">
+      <div class="view-header">
+        <div><div class="view-name">vw_alice_eaud_integracao_sc</div><div class="view-file">Alice — integração e-CGU/e-Aud</div></div>
+        <div class="view-badges"><span class="view-source">Alice</span></div>
+      </div>
+      <div class="view-body"><p>Licitações de SC para as quais o Alice gerou tarefa no sistema e-Aud. Usada na <code>Consulta_LicitacoesSC_PBI</code> para gerar o campo "Alerta pelo e-Aud?" — com <code>SELECT DISTINCT</code> para evitar duplicação.</p></div>
     </div>
   </div>
 

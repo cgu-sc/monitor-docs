@@ -258,6 +258,10 @@
           <span>✅</span>
           <div><strong>Correção:</strong> CTE <code>valores_agregados</code> reescrita com lógica condicional: valor estimado = apenas subitens (<code>numero_item &gt; 0</code>); valor adjudicado = cabeçalhos (<code>numero_item &lt; 0</code>) + itens avulsos sem grupo. O cabeçalho já carrega o valor total do grupo — não multiplicar por quantidade.</div>
         </div>
+        <div class="callout callout-warn" style="margin-top:12px;">
+          <span class="callout-icon">📊</span>
+          <div><strong>Exemplo real do impacto (Pregão 90274/2025, UASG 155913):</strong> 30 itens em 13 grupos, todos adjudicados. Valor total homologado (termo de homologação): <strong>R$ 3.728.490,27</strong>. Antes da correção, o painel mostrava apenas <strong>R$ 99.232,80</strong> — captando somente os 2 itens avulsos. Os 13 grupos inteiros estavam com valor zero.</div>
+        </div>
       </div>
     </div>
 
