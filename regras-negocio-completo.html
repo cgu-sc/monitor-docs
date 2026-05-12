@@ -3,24 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Regras de Negócio — Documento Completo</title>
+  <title>Especificação Técnica Completa — Monitor de Compras SC</title>
   <link rel="stylesheet" href="style.css">
 
-  <!-- Marked.js: renderiza Markdown → HTML -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- marked.js v9 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 
-  <!-- Highlight.js: syntax highlight nos blocos de código -->
+  <!-- highlight.js -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
 
   <style>
-    /* ── Área de conteúdo do MD ─────────────────────────────── */
-    .md-body {
-      max-width: 860px;
+    /* ── Barra de ações (download) ──────────────────────────── */
+    .doc-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 32px;
     }
 
-    /* Cabeçalhos */
+    .btn-download {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--blue-bdr);
+      border-radius: var(--r);
+      padding: 9px 18px;
+      font-family: var(--f-ui);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--blue-lt);
+      text-decoration: none;
+      transition: background .18s, border-color .18s;
+    }
+    .btn-download:hover {
+      background: var(--blue-bg);
+      border-color: var(--blue);
+    }
+    .btn-download svg {
+      width: 14px; height: 14px;
+      fill: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* ── Conteúdo renderizado ───────────────────────────────── */
+    .md-body { max-width: 860px; }
+
     .md-body h1 {
       font-family: var(--f-ui);
       font-size: 26px;
@@ -89,7 +120,6 @@
       margin: 22px 0 8px;
     }
 
-    /* Parágrafos */
     .md-body p {
       font-size: 14px;
       font-weight: 300;
@@ -98,9 +128,7 @@
       margin-bottom: 14px;
     }
     .md-body p strong { color: var(--text); font-weight: 600; }
-    .md-body p em { color: var(--blue-lt); font-style: normal; }
 
-    /* Inline code */
     .md-body p code,
     .md-body li code,
     .md-body td code,
@@ -114,7 +142,6 @@
       color: var(--blue-lt);
     }
 
-    /* Blocos de código */
     .md-body pre {
       background: rgba(0,0,0,.45);
       border-radius: var(--r);
@@ -122,17 +149,14 @@
       margin: 16px 0;
       overflow-x: auto;
     }
-    .md-body pre code {
+    .md-body pre code.hljs {
       font-family: var(--f-mono) !important;
       font-size: 12.5px !important;
       line-height: 1.7;
-      background: transparent !important;
-      border: none !important;
       padding: 18px 20px !important;
-      color: #b8ccd6;
+      background: transparent !important;
     }
 
-    /* Listas */
     .md-body ul, .md-body ol {
       padding-left: 22px;
       margin-bottom: 14px;
@@ -146,7 +170,6 @@
     }
     .md-body li strong { color: var(--text); font-weight: 600; }
 
-    /* Blockquotes */
     .md-body blockquote {
       border-left: 3px solid var(--blue);
       background: var(--blue-bg);
@@ -161,7 +184,6 @@
     }
     .md-body blockquote p strong { color: var(--blue-lt); }
 
-    /* Tabelas */
     .md-body table {
       width: 100%;
       border-collapse: collapse;
@@ -202,14 +224,12 @@
       font-weight: 500;
     }
 
-    /* Linha horizontal */
     .md-body hr {
       border: none;
       border-top: 1px solid var(--border);
       margin: 40px 0;
     }
 
-    /* Links */
     .md-body a {
       color: var(--blue-lt);
       text-decoration: none;
@@ -249,11 +269,6 @@
       font-size: 14px;
       color: var(--text-mid);
     }
-
-    /* ── TOC flutuante (opcional, ativada em telas grandes) ─── */
-    @media (max-width: 860px) {
-      .md-body h2::before, .md-body h3::before { display: none; }
-    }
   </style>
 </head>
 <body>
@@ -282,9 +297,18 @@
 <div class="page-wrap">
 
   <div class="page-top">
-    <div class="page-eyebrow">Documentação / Regras de Negócio</div>
-    <h1 class="page-title">Especificação Técnica <em>Completa</em></h1>
-    <p class="page-subtitle">Documento REGRAS_DE_NEGOCIO.md renderizado integralmente · Atualizado automaticamente</p>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+      <div>
+        <div class="page-eyebrow">Documentação / Regras de Negócio</div>
+        <h1 class="page-title">Especificação Técnica <em>Completa</em></h1>
+        <p class="page-subtitle">Documento REGRAS_DE_NEGOCIO.md renderizado integralmente · Atualizado automaticamente</p>
+      </div>
+      <!-- Botão de download no canto superior direito do cabeçalho -->
+      <a class="btn-download" href="REGRAS_DE_NEGOCIO.md" download="REGRAS_DE_NEGOCIO.md">
+        <svg viewBox="0 0 24 24"><path d="M12 16l-5-5 1.4-1.4 2.6 2.6V4h2v8.2l2.6-2.6L17 11l-5 5zm-7 2h14v2H5v-2z"/></svg>
+        Baixar .md
+      </a>
+    </div>
   </div>
 
   <!-- Conteúdo renderizado pelo marked.js -->
@@ -303,32 +327,28 @@
 </footer>
 
 <script>
-  // ── Configuração do marked.js ──────────────────────────────
-  marked.setOptions({
-    gfm: true,        // GitHub Flavored Markdown (tabelas, etc.)
-    breaks: false,
-    pedantic: false,
-  });
+  const container = document.getElementById('md-content');
 
-  // Renderer customizado para highlight.js nos blocos de código
+  // ── Renderer customizado para highlight.js ─────────────────
   const renderer = new marked.Renderer();
 
-  renderer.code = function(code, language) {
-    const lang = language || 'sql';
+  // API do marked v9: o parâmetro é um objeto { text, lang, escaped }
+  renderer.code = function(token) {
+    const code = token.text || token;
+    const lang = (token.lang || 'sql').split(/\s/)[0];
     let highlighted;
     try {
-      highlighted = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
-    } catch {
+      const validLang = hljs.getLanguage(lang) ? lang : 'sql';
+      highlighted = hljs.highlight(code, { language: validLang, ignoreIllegals: true }).value;
+    } catch (e) {
       highlighted = hljs.highlightAuto(code).value;
     }
-    return `<pre><code class="hljs language-${lang}">${highlighted}</code></pre>`;
+    return '<pre><code class="hljs language-' + (lang || 'sql') + '">' + highlighted + '</code></pre>';
   };
 
   marked.use({ renderer });
 
   // ── Carrega e renderiza o .md ──────────────────────────────
-  const container = document.getElementById('md-content');
-
   fetch('REGRAS_DE_NEGOCIO.md')
     .then(function(res) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -342,6 +362,7 @@
         if (!h.id) {
           h.id = h.textContent
             .toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
             .replace(/[^\w\s-]/g, '')
             .replace(/\s+/g, '-')
             .replace(/-+/g, '-')
@@ -353,7 +374,7 @@
       container.innerHTML =
         '<div class="md-error">' +
         '<strong>Erro ao carregar o documento.</strong><br>' +
-        'Verifique se o arquivo <code>REGRAS_DE_NEGOCIO.md</code> está na mesma pasta. ' +
+        'Verifique se o arquivo <code>REGRAS_DE_NEGOCIO.md</code> está na mesma pasta que este HTML. ' +
         'Detalhes: ' + err.message +
         '</div>';
     });
