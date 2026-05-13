@@ -1,0 +1,7 @@
+backup/
+*.log
+*.tmp
+temp/
+# Caso use Python:
+__pycache__/
+venv/

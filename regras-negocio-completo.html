@@ -369,31 +369,24 @@
       var id = entry.target.id;
       var tag = entry.target.tagName;
 
-      // Remove todos os ativos
+      // Remove apenas os destaques de active — NÃO abre/fecha seções
       tocNav.querySelectorAll('.active').forEach(function(el) { el.classList.remove('active'); });
 
       if (tag === 'H2') {
         var lnk = tocNav.querySelector('.toc-h2-link[href="#' + id + '"]');
         if (lnk) { lnk.classList.add('active'); activeH2 = id; }
       } else {
-        // h3: ativa o link h3 E o h2 pai
+        // h3: destaca o link h3 — sem expandir seções automaticamente
         var sub = tocNav.querySelector('.toc-h3-link[href="#' + id + '"]');
-        if (sub) {
-          sub.classList.add('active');
-          // Abre a seção pai automaticamente
-          var parentSub = sub.closest('.toc-sub');
-          if (parentSub) { parentSub.classList.add('open'); }
-          var parentBtn = sub.closest('.toc-section') && sub.closest('.toc-section').querySelector('.toc-toggle');
-          if (parentBtn) { parentBtn.classList.add('open'); }
-        }
-        // Mantém h2 pai ativo
+        if (sub) { sub.classList.add('active'); }
+        // Mantém h2 pai destacado
         if (activeH2) {
           var parentLnk = tocNav.querySelector('.toc-h2-link[href="#' + activeH2 + '"]');
           if (parentLnk) parentLnk.classList.add('active');
         }
       }
 
-      // Rola a TOC para manter o item visível
+      // Rola a TOC para manter o item ativo visível
       var activeLnk = tocNav.querySelector('.active');
       if (activeLnk) {
         var panel = document.getElementById('toc-panel');
