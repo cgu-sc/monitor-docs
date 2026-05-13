@@ -21,12 +21,15 @@
       max-height: calc(100vh - var(--header-h) - var(--tabs-h) - 56px);
       overflow-y: auto;
       scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
+      scrollbar-color: var(--blue-bdr) transparent;
       /* Some quando não houver espaço suficiente */
       display: none;
     }
     .toc-panel::-webkit-scrollbar { width: 3px; }
-    .toc-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .toc-panel::-webkit-scrollbar { width: 4px; }
+    .toc-panel::-webkit-scrollbar-track { background: transparent; }
+    .toc-panel::-webkit-scrollbar-thumb { background: var(--blue-bdr); border-radius: 2px; }
+    .toc-panel::-webkit-scrollbar-thumb:hover { background: var(--blue); }
 
     /* Só aparece quando a tela tiver espaço:
        page-wrap (1040px) + gap (16px) + toc (200px) + gap (16px) em cada lado = ~1488px */
